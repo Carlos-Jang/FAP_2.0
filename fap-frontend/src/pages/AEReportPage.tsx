@@ -12,44 +12,11 @@ interface Project {
 }
 
 export default function AESaveReportPage() {
-  const [measureProjects, setMeasureProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [reportContent, setReportContent] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const selectedTeam = localStorage.getItem('fap_user_teams');
-    let selectedParts: string[] = [];
-    try {
-      selectedParts = JSON.parse(localStorage.getItem('fap_user_parts') || '[]');
-    } catch {}
-    
-    // Measure 파트 체크 시 대괄호 제거하여 비교
-    const hasMeasurePart = selectedParts.some(part => 
-      isPartMatch(part, 'Measure')
-    );
-    
-    if (selectedTeam === 'SBU' && hasMeasurePart) {
-      setLoading(true);
-      fetch('/api/projects/measure')
-        .then(res => {
-          if (!res.ok) throw new Error('Measure 설비 리스트를 불러오지 못했습니다');
-          return res.json();
-        })
-        .then(data => {
-          setMeasureProjects(data);
-          setLoading(false);
-        })
-        .catch(e => {
-          setError(e.message);
-          setLoading(false);
-        });
-    } else {
-      setMeasureProjects([]);
-    }
-  }, []);
+  // measureProjects, setMeasureProjects, loading, error, setLoading, setError 등 measure 관련 상태 및 useEffect, fetch('/api/projects/measure') 호출 부분 전체 삭제
 
   const handleSaveToRedmine = async () => {
     if (!selectedProject || !reportContent.trim()) {
@@ -93,10 +60,7 @@ export default function AESaveReportPage() {
       <div style={{ fontSize: '1.3rem', color: '#222', margin: 32 }}>
         <div style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>AE Save Report</div>
         
-        {loading && <div>로딩 중...</div>}
-        {error && <div style={{ color: 'red' }}>{error}</div>}
-        
-        {measureProjects.length > 0 ? (
+        {/* measureProjects.length > 0 ? ( */}
           <div style={{ display: 'flex', gap: 32 }}>
             {/* 설비 선택 영역 */}
             <div style={{ flex: 1 }}>
@@ -109,23 +73,23 @@ export default function AESaveReportPage() {
                 maxHeight: '400px',
                 overflowY: 'auto'
               }}>
-                {measureProjects.map(project => (
+                {/* measureProjects.map(project => ( */}
                   <div
-                    key={project.id}
-                    onClick={() => setSelectedProject(project)}
+                    key={1} // Placeholder for project data
+                    onClick={() => setSelectedProject({ id: 1, name: 'Measure 설비 1' })}
                     style={{
                       padding: '12px 16px',
                       marginBottom: 8,
                       borderRadius: 6,
                       cursor: 'pointer',
-                      background: selectedProject?.id === project.id ? '#e3e6f0' : '#f8f9fa',
-                      border: selectedProject?.id === project.id ? '2px solid #132257' : '1px solid #e0e3ea',
+                      background: selectedProject?.id === 1 ? '#e3e6f0' : '#f8f9fa',
+                      border: selectedProject?.id === 1 ? '2px solid #132257' : '1px solid #e0e3ea',
                       transition: 'all 0.2s'
                     }}
                   >
-                    {project.name}
+                    Measure 설비 1
                   </div>
-                ))}
+                {/* ))} */}
               </div>
             </div>
 
@@ -193,11 +157,11 @@ export default function AESaveReportPage() {
               )}
             </div>
           </div>
-        ) : !loading && !error ? (
+        {/* ) : !loading && !error ? ( */}
           <div style={{ color: '#888', fontSize: '1.1rem' }}>
             SBU/Measure로 설정된 경우에만 Measure 설비 리스트가 출력됩니다.
           </div>
-        ) : null}
+        {/* ) : null} */}
       </div>
     </Layout>
   )

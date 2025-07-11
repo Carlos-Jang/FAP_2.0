@@ -6,6 +6,8 @@ from fastapi import Path, Query
 import requests
 from fastapi import HTTPException
 from config import REDMINE_URL, API_KEY as REDMINE_API_KEY
+from fastapi import Body
+from fastapi import Request
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -18,103 +20,113 @@ _projects = [
     Project(id=2, name="Project B"),
 ]
 
-@router.get("/", response_model=List[Project])
-async def list_projects():
-    return _projects
-
-@router.get("/{project_id}", response_model=Project)
-async def get_project(project_id: int):
-    project = next((p for p in _projects if p.id == project_id), None)
-    if not project:
-        return {"error": "Project not found"}
-    return project
-
-@router.get('/{project_id}/detail')
-def get_project_detail(project_id: int = Path(...)):
+def fetch_redmine_issue(issue_id: int):
     """
-    프로젝트 ID로 Redmine에서 프로젝트 상세 정보를 조회하여 반환
-    (부모 프로젝트, 부모의 부모 정보까지 포함)
-    """
-    url = f"{REDMINE_URL}/projects/{project_id}.json?include=parent"
-    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
-    resp = requests.get(url, headers=headers, timeout=10)
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    data = resp.json().get('project', {})
-    location = data.get('parent', {}).get('name') if data.get('parent') else None
-    site = None
-    # 부모가 있으면 부모의 부모도 조회
-    if data.get('parent') and data['parent'].get('id'):
-        parent_id = data['parent']['id']
-        parent_url = f"{REDMINE_URL}/projects/{parent_id}.json?include=parent"
-        parent_resp = requests.get(parent_url, headers=headers, timeout=10)
-        if parent_resp.status_code == 200:
-            parent_data = parent_resp.json().get('project', {})
-            site = parent_data.get('parent', {}).get('name') if parent_data.get('parent') else None
-    data['location'] = location
-    data['site'] = site
-    return data
-
-@router.get('/{project_id}/parent-log')
-def log_parent_project(project_id: int = Path(...)):
-    """
-    프로젝트 ID로 Redmine에서 프로젝트 상세 정보를 조회하고,
-    부모 프로젝트 정보(있으면)를 서버 로그에 출력
-    """
-    url = f"{REDMINE_URL}/projects/{project_id}.json?include=parent"
-    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
-    resp = requests.get(url, headers=headers, timeout=10)
-    print(f"[Redmine 응답] status={resp.status_code}, text={resp.text}")
-    if resp.status_code != 200:
-        return {"error": f"Redmine API error: {resp.status_code}"}
-    data = resp.json().get('project', {})
-    parent = data.get('parent')
-    if parent:
-        print(f"[부모 프로젝트] id={parent.get('id')}, name={parent.get('name')}")
-        return {"parent": parent}
-    else:
-        print("[부모 프로젝트] 부모 없음")
-        return {"parent": None}
-
-@router.get('/redmine-issues')
-def get_redmine_issues(limit: int = 10, offset: int = 0):
-    """
-    Redmine에서 전체 일감(이슈) 리스트를 조회하는 단순 API
-    """
-    url = f"{REDMINE_URL}/issues.json"
-    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
-    params = {"limit": limit, "offset": offset}
-    resp = requests.get(url, headers=headers, params=params)
-    if resp.status_code == 200:
-        return resp.json().get("issues", [])
-    else:
-        return []
-
-@router.get('/log-latest-issue')
-def log_latest_issue():
-    """
-    Redmine에서 가장 최근 일감(이슈) 하나의 정보를 받아와 서버 로그에 출력
-    """
-    url = f"{REDMINE_URL}/issues.json?limit=1&offset=0&sort=id:desc"
-    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
-    resp = requests.get(url, headers=headers, timeout=10)
-    if resp.status_code == 200:
-        issues = resp.json().get("issues", [])
-        if issues:
-            print("[가장 최근 일감]", issues[0])
-    else:
-        print(f"[Redmine 일감 조회 실패] status={resp.status_code}, text={resp.text}")
-    return {"success": True}
-
-@router.get('/redmine-issue/{issue_id}')
-def get_redmine_issue(issue_id: int):
-    """
-    Redmine에서 단일 일감(이슈) 정보를 받아오는 API
+    Redmine에서 이슈 전체 정보를 받아오는 헬퍼 함수
     """
     url = f"{REDMINE_URL}/issues/{issue_id}.json"
     headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
     resp = requests.get(url, headers=headers, timeout=10)
     if resp.status_code == 200:
-        return resp.json()
+        return resp.json().get("issue", {})
     else:
-        return {"error": f"Redmine API error: {resp.status_code}"}
+        return None
+
+def get_parent_issue_id(project_id: int):
+    """
+    project_id로 Redmine에서 프로젝트 정보를 받아와 부모 일감 ID를 반환하는 헬퍼 함수
+    """
+    url = f"{REDMINE_URL}/projects/{project_id}.json"
+    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
+    resp = requests.get(url, headers=headers, timeout=10)
+    if resp.status_code == 200:
+        project = resp.json().get("project", {})
+        parent = project.get('parent', {})
+        if parent:
+            return parent.get('id')
+    return None
+
+def get_project_name(project_id: int):
+    """
+    project_id로 Redmine에서 프로젝트 정보를 받아와 프로젝트 이름을 반환하는 헬퍼 함수
+    """
+    url = f"{REDMINE_URL}/projects/{project_id}.json"
+    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
+    resp = requests.get(url, headers=headers, timeout=10)
+    if resp.status_code == 200:
+        project = resp.json().get("project", {})
+        return project.get('name', '')
+    return None
+
+@router.post('/find-report')
+async def find_report(request: Request):
+    """
+    Find Report: issue_id가 있으면 단일 이슈 전체 정보만 리턴
+    """
+    data = await request.json() if request.method == 'POST' else request.query_params
+    issue_id = int(data.get('issue_id', 0))
+    if issue_id:
+        issue = fetch_redmine_issue(issue_id)
+        if issue:
+            return {"issues": [issue]}
+        else:
+            return {"issues": []}
+    else:
+        return {"issues": []}
+
+@router.post('/find-five-report')
+async def find_five_report(request: Request):
+    """
+    Find Five Report: author_name을 받아 offset을 사용해 3개가 찰 때까지 100개씩 최대 5번(총 500개) Redmine에서 이슈를 받아오고, 작성자가 일치하는 이슈만 detailed_issues에 추가하여 3개가 되면 리턴.
+    병렬처리로 성능 개선.
+    """
+    data = await request.json() if request.method == 'POST' else request.query_params
+    author_name = data.get('author_name', None)
+    if not author_name:
+        return {"issues": []}
+    import requests
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    detailed_issues = []
+    offset = 0
+    while len(detailed_issues) < 3 and offset < 500:
+        url = f"{REDMINE_URL}/issues.json?limit=100&offset={offset}&sort=id:desc"
+        headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            break
+        issues = resp.json().get("issues", [])
+        if not issues:
+            break
+        # 작성자가 일치하는 이슈들만 필터링
+        matching_issues = [i for i in issues if i.get('author', {}).get('name') == author_name]
+        if matching_issues:
+            # 병렬로 상세 정보 가져오기
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_issue = {executor.submit(fetch_redmine_issue, issue['id']): issue for issue in matching_issues}
+                for future in as_completed(future_to_issue):
+                    detail = future.result()
+                    if detail:
+                        detailed_issues.append(detail)
+                        if len(detailed_issues) == 3:
+                            break
+        offset += 100
+    return {"issues": detailed_issues}
+
+@router.post('/get-site')
+async def get_site(request: Request):
+    """
+    project_id를 받아 1번 부모 타고 올라가서 location, 1번 더 부모 타고 올라가서 site를 반환
+    """
+    data = await request.json() if request.method == 'POST' else request.query_params
+    project_id = int(data.get('project_id', 0))
+    if not project_id:
+        return {"site": None, "location": None}
+    parent1 = get_parent_issue_id(project_id)
+    location = get_project_name(parent1) if parent1 else None
+    parent2 = get_parent_issue_id(parent1) if parent1 else None
+    site = get_project_name(parent2) if parent2 else None
+    return {"site": site, "location": location}
+
+
+
+

@@ -9,53 +9,121 @@ interface Issue {
   due_date?: string;
 }
 
+function extractModel(issue: any) {
+  if (!issue) return '-';
+  const field = issue.custom_fields?.find((f: any) =>
+    f.name.toLowerCase().includes('설비군') || f.name.toLowerCase().includes('product')
+  );
+  return field?.value || '-';
+}
+
+function extractDeviceId(issue: any) {
+  if (!issue) return '-';
+  const name = issue.project?.name || '';
+  const match = name.match(/#\d+\s*(?:\([^)]*\)\s*)?(\w+)/);
+  return match ? match[1] : '-';
+}
+
+function extractWarranty(issue: any) {
+  if (!issue) return '-';
+  // custom_fields에서 '비용'이 포함된 필드 찾기
+  const field = issue.custom_fields?.find((f: any) =>
+    f.name.includes('비용')
+  );
+  return field?.value || '-';
+}
+
+// description에서 마크다운 헤더별로 내용을 추출하는 함수
+function extractSectionFromDescription(description: string, section: string): string {
+  if (!description) return '-';
+  // section: '문제', '원인', '조치', '결과', '특이사항', 'ATI 내부 공유' 등
+  const regex = new RegExp(`### ${section}([\s\S]*?)(?=###|$)`, 'i');
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  // ~~~ 마크다운 코드블록 제거
+  content = content.replace(/~~~[\s\S]*?~~~/g, '').trim();
+  // 앞뒤 공백 및 불필요한 개행 제거
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+
+// '### 문제'와 '### 원인' 사이의 내용을 추출하는 함수
+function extractProblemFromDescription(description: string): string {
+  if (!description) return '-';
+  const regex = /### 문제([\s\S]*?)(?=### 원인|$)/i;
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  // ~~~ 마크다운 구분자만 삭제 (내용은 남김)
+  content = content.replace(/~~~/g, '').trim();
+  // 앞뒤 공백 및 불필요한 개행 제거
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+
+// '### 원인' ~ '### 조치'
+function extractCauseFromDescription(description: string): string {
+  if (!description) return '-';
+  const regex = /### 원인([\s\S]*?)(?=### 조치|$)/i;
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  content = content.replace(/~~~/g, '').trim();
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+// '### 조치' ~ '### 결과'
+function extractActionFromDescription(description: string): string {
+  if (!description) return '-';
+  const regex = /### 조치([\s\S]*?)(?=### 결과|$)/i;
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  content = content.replace(/~~~/g, '').trim();
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+// '### 결과' ~ '### 특이사항'
+function extractResultFromDescription(description: string): string {
+  if (!description) return '-';
+  const regex = /### 결과([\s\S]*?)(?=### 특이사항|$)/i;
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  content = content.replace(/~~~/g, '').trim();
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+// '### 특이사항' ~ 다음 헤더 또는 끝
+function extractNoteFromDescription(description: string): string {
+  if (!description) return '-';
+  const regex = /### 특이사항([\s\S]*?)(?=### ATI 내부 공유|$)/i;
+  const match = description.match(regex);
+  if (!match) return '-';
+  let content = match[1].trim();
+  content = content.replace(/~~~/g, '').trim();
+  content = content.replace(/^\s+|\s+$/g, '');
+  return content || '-';
+}
+
 export default function AEMakeReportPage() {
   const [activeTab, setActiveTab] = useState<'view' | 'make'>('make');
   const [issueNum, setIssueNum] = useState('');
   const [issues, setIssues] = useState<any[]>([]);
   const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
-  const [projectDetail, setProjectDetail] = useState<any>(null);
-  // 실제로는 localStorage에서 가져오지만, 테스트를 위해 하드코딩
+  const [issueDetail, setIssueDetail] = useState<any>(null);
   const userName = localStorage.getItem('fap_user_name') || '시스템 관리자';
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+  const [loading, setLoading] = useState(false);
+  const [site, setSite] = useState('-');
+  const [location, setLocation] = useState('-');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  useEffect(() => {
-    if (selectedIssueId) {
-      const selected = issues.find(i => i.id === selectedIssueId);
-      const projectId = (selected as any)?.project?.id;
-      if (projectId) {
-        fetch(`/api/projects/${projectId}/detail`)
-          .then(res => res.json())
-          .then(data => setProjectDetail(data))
-          .catch(() => setProjectDetail(null));
-      } else {
-        setProjectDetail(null);
-      }
-    } else {
-      setProjectDetail(null);
-    }
-  }, [selectedIssueId]);
-
-  const handleFindReport = async () => {
-    if (issueNum.trim() === '') return;
-    try {
-      const res = await fetch(`/api/projects/redmine-issue/${issueNum.trim()}`);
-      const data = await res.json();
-      if (data && data.issue) {
-        setIssues([data.issue]);
-      } else {
-        setIssues([]);
-      }
-    } catch (e) {
-      setIssues([]);
-    }
-  };
 
   if (isMobile) {
     return (
@@ -67,7 +135,6 @@ export default function AEMakeReportPage() {
     );
   }
 
-  // 우측 상세 정보 임시 데이터
   const detail = {
     model: 'WIND',
     site: '천안 캠퍼스',
@@ -81,6 +148,61 @@ export default function AEMakeReportPage() {
     action: 'Theta 특이값 반영 시에도 EES 정상 출력되도록 수정',
     result: 'EES 정상 출력 확인',
     note: '',
+  };
+
+  // Find Report 버튼 클릭 시 전체 이슈 정보 받아오기
+  const handleFindReport = async () => {
+    setLoading(true);
+    if (issueNum.trim()) {
+      // 이슈 번호가 있으면 find-report 호출
+      const payload = { issue_id: Number(issueNum.trim()) };
+      try {
+        const res = await fetch('/api/projects/find-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data && data.issues) {
+          setIssues(data.issues);
+          setSelectedIssueId(null);
+          setIssueDetail(null);
+        } else {
+          setIssues([]);
+          setSelectedIssueId(null);
+          setIssueDetail(null);
+        }
+      } catch {
+        setIssues([]);
+        setSelectedIssueId(null);
+        setIssueDetail(null);
+      }
+    } else {
+      // 이슈 번호가 없으면 find-five-report 호출
+      const payload = { author_name: userName };
+      try {
+        const res = await fetch('/api/projects/find-five-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data && data.issues) {
+          setIssues(data.issues);
+          setSelectedIssueId(null);
+          setIssueDetail(null);
+        } else {
+          setIssues([]);
+          setSelectedIssueId(null);
+          setIssueDetail(null);
+        }
+      } catch {
+        setIssues([]);
+        setSelectedIssueId(null);
+        setIssueDetail(null);
+      }
+    }
+    setLoading(false);
   };
 
   return (
@@ -97,12 +219,47 @@ export default function AEMakeReportPage() {
               placeholder="Issue Num."
               style={{ flex: 1, fontSize: '1.1rem', padding: '6px 12px', border: '1px solid #ccc', borderRadius: 6, marginRight: 8 }}
             />
-            <button onClick={handleFindReport} style={{ fontWeight: 600, fontSize: '1rem', padding: '7px 18px', borderRadius: 6, background: '#28313b', color: '#fff', border: 'none', cursor: 'pointer' }}>Find Report</button>
+            <button
+              onClick={handleFindReport}
+              disabled={loading}
+              style={{ fontWeight: 600, fontSize: '1rem', padding: '7px 18px', borderRadius: 6, background: '#28313b', color: '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}
+            >{loading ? '로딩중...' : 'Find Report'}</button>
           </div>
           {/* 탭 버튼 */}
           <div style={{ display: 'flex', marginBottom: 8, gap: 8 }}>
             <button
-              onClick={() => setActiveTab('view')}
+              onClick={async () => {
+                setActiveTab('view');
+                const selected = issues.find(i => i.id === selectedIssueId);
+                if (selected) {
+                  setIssueDetail(selected);
+                  // Site, Location 정보 비동기 요청
+                  if (selected.project && selected.project.id) {
+                    setSite('-');
+                    setLocation('-');
+                    try {
+                      const res = await fetch('/api/projects/get-site', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_id: selected.project.id })
+                      });
+                      const data = await res.json();
+                      setSite(data.site || '-');
+                      setLocation(data.location || '-');
+                    } catch {
+                      setSite('-');
+                      setLocation('-');
+                    }
+                  } else {
+                    setSite('-');
+                    setLocation('-');
+                  }
+                } else {
+                  setIssueDetail(null);
+                  setSite('-');
+                  setLocation('-');
+                }
+              }}
               style={{
                 flex: 1,
                 fontWeight: 600,
@@ -151,7 +308,14 @@ export default function AEMakeReportPage() {
               </thead>
               <tbody>
                 {issues.map(issue => (
-                  <tr key={issue.id}>
+                  <tr
+                    key={issue.id}
+                    onClick={() => setSelectedIssueId(issue.id)}
+                    style={{
+                      background: selectedIssueId === issue.id ? '#e3e6f0' : undefined,
+                      cursor: 'pointer'
+                    }}
+                  >
                     <td style={{ color: '#222', fontWeight: 500, fontSize: '0.98rem', padding: '12px 8px', borderBottom: '1px solid #f0f0f0' }}>{issue.id}</td>
                     <td style={{ color: '#222', fontWeight: 500, fontSize: '0.98rem', padding: '12px 8px', borderBottom: '1px solid #f0f0f0' }}>{issue.subject}</td>
                   </tr>
@@ -168,85 +332,45 @@ export default function AEMakeReportPage() {
           </div>
         </div>
         {/* 우측 상세 패널 */}
-        <div style={{ flex: 1, background: '#fff', borderRadius: 8, boxShadow: 'var(--color-shadow)', padding: 32, display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
+        <div
+          style={{
+            flex: 1,
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: 'var(--color-shadow)',
+            padding: 32,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            height: '100%',
+            overflowX: 'auto' // 또는 'hidden'
+          }}
+        >
           {activeTab === 'view' ? (
             selectedIssueId
-              ? (() => {
-                  const selected = issues.find(i => i.id === selectedIssueId);
-                  if (!selected) return <div>이슈 정보를 찾을 수 없습니다.</div>;
-                  // Model 추출: custom_fields에서 name에 '설비군'이 포함된 value
-                  let model = '-';
-                  const customFields = (selected as any).custom_fields;
-                  if (Array.isArray(customFields)) {
-                    const found = customFields.find((f: any) => f.name && f.name.includes('설비군'));
-                    if (found && found.value) model = found.value;
-                  }
-                  // Device ID 추출: #숫자 뒤 괄호 블럭 모두 무시, 그 다음 일반 단어를 Device ID로 사용
-                  let deviceId = '-';
-                  const project = (selected as any).project;
-                  if (project?.name && typeof project.name === 'string') {
-                    const afterHash = project.name.split(/#\d+/)[1];
-                    if (afterHash) {
-                      const blocks = afterHash.trim().split(/\s+/);
-                      const realId = blocks.find((block: string) => !block.startsWith('('));
-                      if (realId) deviceId = realId;
-                    }
-                  }
-                  // Location, Site 추출: 백엔드에서 location, site 필드로 바로 반환
-                  let location = projectDetail?.location || '-';
-                  let site = projectDetail?.site || '-';
-                  // Operator 추출: author.name
-                  const operator = selected.author?.name || '-';
-                  // Warranty 추출: custom_fields에서 name에 '비용' 포함된 value
-                  let warranty = '-';
-                  if (Array.isArray(customFields)) {
-                    const found = customFields.find((f: any) => f.name && f.name.includes('비용'));
-                    if (found && found.value) warranty = found.value;
-                  }
-                  // Description 마크다운 파싱
-                  const description = (selected as any).description || '';
-                  function extractSection(desc: string, start: string, end?: string) {
-                    const startIdx = desc.indexOf(start);
-                    if (startIdx === -1) return '';
-                    const from = desc.slice(startIdx + start.length);
-                    let section = from;
-                    if (end) {
-                      const endIdx = from.indexOf(end);
-                      if (endIdx !== -1) section = from.slice(0, endIdx);
-                    }
-                    // ~~~ 마크다운 코드블럭 제거
-                    return section.replace(/~~~/g, '').trim();
-                  }
-                  const problem = extractSection(description, '### 문제', '### 원인');
-                  const cause = extractSection(description, '### 원인', '### 조치');
-                  const action = extractSection(description, '### 조치', '### 결과');
-                  const result = extractSection(description, '### 결과', '### 특이사항');
-                  const note = extractSection(description, '### 특이사항', '### ATI 내부 공유');
-                  return (
-                    <>
-                      {/* 2열(2컬럼) 레이아웃으로 상단 정보 배치 */}
-                      <div style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                          <InfoRow label="Model" value={model} valueColor="#222" />
-                          <InfoRow label="Site" value={site} valueColor="#222" />
-                          <InfoRow label="Operator" value={operator} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                          <InfoRow label="Device ID" value={deviceId} valueColor="#222" />
-                          <InfoRow label="Location" value={location} valueColor="#222" />
-                          <InfoRow label="Warranty" value={warranty} />
-                        </div>
+              ? (
+                  <>
+                    {/* 2열(2컬럼) 레이아웃으로 상단 정보 배치 */}
+                    <div style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                        <InfoRow label="Model" value={extractModel(issueDetail)} valueColor="#222" />
+                        <InfoRow label="Site" value={site} valueColor="#222" />
+                        <InfoRow label="Operator" value={issueDetail?.author?.name || '-'} />
                       </div>
-                      <InfoBlock label="Summary" value={selected.subject || ''} />
-                      <InfoBlock label="Problem" value={problem} />
-                      <InfoBlock label="Cause" value={cause} />
-                      <InfoBlock label="Action" value={action} />
-                      <InfoBlock label="Result" value={result} />
-                      <InfoBlock label="Note" value={note} />
-                    </>
-                  );
-                })()
-              : <div style={{ color: '#888', fontSize: '1.1rem' }}>좌측에서 이슈를 선택해주세요.</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                        <InfoRow label="Device ID" value={extractDeviceId(issueDetail)} valueColor="#222" />
+                        <InfoRow label="Location" value={location} valueColor="#222" />
+                        <InfoRow label="Warranty" value={extractWarranty(issueDetail)} />
+                      </div>
+                    </div>
+                    <InfoBlock label="Summary" value={issueDetail?.subject || '-'} />
+                    <InfoBlock label="Problem" value={extractProblemFromDescription(issueDetail?.description)} />
+                    <InfoBlock label="Cause" value={extractCauseFromDescription(issueDetail?.description)} />
+                    <InfoBlock label="Action" value={extractActionFromDescription(issueDetail?.description)} />
+                    <InfoBlock label="Result" value={extractResultFromDescription(issueDetail?.description)} />
+                    <InfoBlock label="Note" value={extractNoteFromDescription(issueDetail?.description)} />
+                  </>
+              ) : <div style={{ color: '#888', fontSize: '1.1rem' }}>좌측에서 이슈를 선택해주세요.</div>
           ) : (
             <>
               {/* 기존 detail 정보 출력 */}

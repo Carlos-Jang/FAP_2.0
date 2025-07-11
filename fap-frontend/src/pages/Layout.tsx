@@ -23,6 +23,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     setUserId(id);
     const name = localStorage.getItem('fap_user_name') || '';
     setUserName(name);
+    console.log('Layout.tsx - localStorage userName:', name);
     const roles = localStorage.getItem('fap_user_roles');
     if (roles) {
       setUserRoles(JSON.parse(roles));
@@ -32,19 +33,8 @@ export default function Layout({ children }: { children: ReactNode }) {
   const handleLogout = () => {
     localStorage.removeItem('fap_logged_in');
     localStorage.removeItem('fap_user_id');
-    localStorage.removeItem('fap_user_name');
+    // localStorage.removeItem('fap_user_name'); // ← 삭제 또는 주석 처리
     navigate('/login');
-  };
-
-  const handleRefresh = async () => {
-    try {
-      const res = await fetch('/api/projects/refresh', { method: 'POST' });
-      if (!res.ok) throw new Error('새로고침 실패');
-      const data = await res.json();
-      alert(`프로젝트 캐시가 새로고침되었습니다. (총 ${data.count}개)`);
-    } catch (e) {
-      alert('프로젝트 캐시 새로고침에 실패했습니다.');
-    }
   };
 
   return (
@@ -58,9 +48,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           </span>
         </div>
         <div className="fap-main-header-btns" style={{ flex: 1.2, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          {userId === 'admin' && (
-            <button onClick={handleRefresh} className="fap-main-btn">Refresh</button>
-          )}
           <button onClick={handleLogout} className="fap-main-btn" style={{ minWidth: 120, padding: '0.5rem 2.2rem', fontSize: '1.08rem' }}>Log out</button>
           <button onClick={() => window.open('https://pms.ati2000.co.kr', '_blank')} className="fap-main-btn">PMS</button>
           <button onClick={() => navigate('/setting')} className="fap-main-btn">Setting</button>
