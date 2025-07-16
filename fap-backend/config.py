@@ -15,14 +15,3 @@ DEFAULT_FONT = ("맑은 고딕", 10)
 
 # Root 프로젝트(팀) ID: Help GPT 프로젝트
 HELP_GPT_PROJECT_ID = "help-gpt"  # 'Help GPT' 프로젝트의 Redmine ID
-
-# 팀별 관리 설비명 리스트 (프로젝트명 앞부분)
-TEAM_PROJECTS = {
-    "Measure": [
-        "WIND 3D",
-        "Camellia2",
-        "OAK 3D",
-        "Putter",
-        "Triton",
-    ],
-}

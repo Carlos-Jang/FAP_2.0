@@ -1,12 +1,24 @@
 # main.py
 from fastapi import FastAPI, Request, HTTPException
-from routers.projects import router as projects_router
+from fastapi.middleware.cors import CORSMiddleware
+from routers.redmine_service import router as projects_router
+from routers.issue_database import router as issues_router
 from pydantic import BaseModel
 import requests
 
 app = FastAPI(title="FAP 2.0", version="0.1.0")
 
+# CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # 프론트엔드 주소들
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(projects_router)
+app.include_router(issues_router)
 
 class LoginRequest(BaseModel):
     id: str

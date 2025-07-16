@@ -1,13 +1,5 @@
 import Layout from './Layout'
-import React, { useState, useEffect } from 'react'
-
-interface Issue {
-  id: number;
-  subject: string;
-  author?: { name: string };
-  start_date?: string;
-  due_date?: string;
-}
+import { useState, useEffect } from 'react'
 
 function extractModel(issue: any) {
   if (!issue) return '-';
@@ -31,21 +23,6 @@ function extractWarranty(issue: any) {
     f.name.includes('비용')
   );
   return field?.value || '-';
-}
-
-// description에서 마크다운 헤더별로 내용을 추출하는 함수
-function extractSectionFromDescription(description: string, section: string): string {
-  if (!description) return '-';
-  // section: '문제', '원인', '조치', '결과', '특이사항', 'ATI 내부 공유' 등
-  const regex = new RegExp(`### ${section}([\s\S]*?)(?=###|$)`, 'i');
-  const match = description.match(regex);
-  if (!match) return '-';
-  let content = match[1].trim();
-  // ~~~ 마크다운 코드블록 제거
-  content = content.replace(/~~~[\s\S]*?~~~/g, '').trim();
-  // 앞뒤 공백 및 불필요한 개행 제거
-  content = content.replace(/^\s+|\s+$/g, '');
-  return content || '-';
 }
 
 // '### 문제'와 '### 원인' 사이의 내용을 추출하는 함수
@@ -107,6 +84,22 @@ function extractNoteFromDescription(description: string): string {
   return content || '-';
 }
 
+// 엑셀 파일 다운로드 함수
+function handleDownloadExcel() {
+  fetch('/api/projects/make-report-download')
+    .then(res => res.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Report.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    });
+}
+
 export default function AEMakeReportPage() {
   const [activeTab, setActiveTab] = useState<'view' | 'make'>('make');
   const [issueNum, setIssueNum] = useState('');
@@ -134,21 +127,6 @@ export default function AEMakeReportPage() {
       </Layout>
     );
   }
-
-  const detail = {
-    model: 'WIND',
-    site: '천안 캠퍼스',
-    operator: 'AE 하윤호',
-    deviceId: 'AQS09',
-    location: 'C1 4F',
-    warranty: '유상',
-    summary: 'VisionWorks2_2.07.105_Rev20250701 Update',
-    problem: "IR Die Acc'y 계측 후 간헐적으로 일부 Chip Index EES Data 누락 발생",
-    cause: 'Gauge Data 점검 시 해당 Index Theta 특이값 반영 시 문제 발생 확인',
-    action: 'Theta 특이값 반영 시에도 EES 정상 출력되도록 수정',
-    result: 'EES 정상 출력 확인',
-    note: '',
-  };
 
   // Find Report 버튼 클릭 시 전체 이슈 정보 받아오기
   const handleFindReport = async () => {
@@ -278,7 +256,7 @@ export default function AEMakeReportPage() {
               View Report
             </button>
             <button
-              onClick={() => setActiveTab('make')}
+              onClick={handleDownloadExcel}
               style={{
                 flex: 1,
                 fontWeight: 600,
@@ -376,22 +354,22 @@ export default function AEMakeReportPage() {
               {/* 기존 detail 정보 출력 */}
               <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <InfoRow label="Model" value={detail.model} />
-                  <InfoRow label="Site" value={detail.site} />
-                  <InfoRow label="Operator" value={detail.operator} />
+                  <InfoRow label="Model" value={extractModel(issueDetail)} />
+                  <InfoRow label="Site" value={site} />
+                  <InfoRow label="Operator" value={issueDetail?.author?.name || '-'} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <InfoRow label="Device ID" value={detail.deviceId} />
-                  <InfoRow label="Location" value={detail.location} />
-                  <InfoRow label="Warranty" value={detail.warranty} />
+                  <InfoRow label="Device ID" value={extractDeviceId(issueDetail)} />
+                  <InfoRow label="Location" value={location} />
+                  <InfoRow label="Warranty" value={extractWarranty(issueDetail)} />
                 </div>
               </div>
-              <InfoBlock label="Summary" value={detail.summary} />
-              <InfoBlock label="Problem" value={detail.problem} />
-              <InfoBlock label="Cause" value={detail.cause} />
-              <InfoBlock label="Action" value={detail.action} />
-              <InfoBlock label="Result" value={detail.result} />
-              <InfoBlock label="Note" value={detail.note} />
+              <InfoBlock label="Summary" value={issueDetail?.subject || '-'} />
+              <InfoBlock label="Problem" value={extractProblemFromDescription(issueDetail?.description)} />
+              <InfoBlock label="Cause" value={extractCauseFromDescription(issueDetail?.description)} />
+              <InfoBlock label="Action" value={extractActionFromDescription(issueDetail?.description)} />
+              <InfoBlock label="Result" value={extractResultFromDescription(issueDetail?.description)} />
+              <InfoBlock label="Note" value={extractNoteFromDescription(issueDetail?.description)} />
             </>
           )}
         </div>

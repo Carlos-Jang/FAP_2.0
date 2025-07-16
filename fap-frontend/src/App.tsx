@@ -1,5 +1,4 @@
 // src/App.tsx
-import React from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import MainPage      from './pages/MainPage'
 import AESaveReportPage  from './pages/AEReportPage'

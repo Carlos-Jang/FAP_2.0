@@ -2,6 +2,7 @@ import Layout from './Layout';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { normalizeText } from '../utils/textUtils';
+import axios from 'axios';
 
 const ROLES = ['Manager', 'AE', 'SW', 'PM', 'Setup'];
 const TEAMS = ['PM', 'SBU', 'HBU', 'PKG', 'Grobal', 'Sales', 'SW'];
@@ -19,6 +20,8 @@ export default function SettingPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [userName, setUserName] = useState('');
+  const [projectLimit, setProjectLimit] = useState(1000);
+  const [issueLimit, setIssueLimit] = useState(10000);
 
   // 진입 시 localStorage에서 불러오기
   useEffect(() => {
@@ -68,6 +71,40 @@ export default function SettingPage() {
   };
   const handleExit = () => {
     navigate('/main');
+  };
+
+  const handleLoadProjects = async () => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/issues/sync-projects', {}, {
+        params: { limit: projectLimit }
+      });
+      
+      if (response.data.success) {
+        alert(`프로젝트 로드 완료!\n${response.data.message}\n총 ${response.data.data.count}개 프로젝트 처리됨`);
+      } else {
+        alert('프로젝트 로드 실패: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('프로젝트 로드 에러:', error);
+      alert('프로젝트 로드 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleLoadIssues = async () => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/issues/sync', {}, {
+        params: { limit: issueLimit }
+      });
+      
+      if (response.data.success) {
+        alert(`이슈 로드 완료!\n${response.data.message}\n총 ${response.data.data.count}개 이슈 처리됨`);
+      } else {
+        alert('이슈 로드 실패: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('이슈 로드 에러:', error);
+      alert('이슈 로드 중 오류가 발생했습니다.');
+    }
   };
 
   // PC/모바일 환경 감지 (900px 이하를 모바일로 간주)
@@ -185,6 +222,66 @@ export default function SettingPage() {
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-end', marginTop: 0 }}>
+            {/* 시스템 관리자용 버튼들 */}
+            {localStorage.getItem('fap_user_id') === 'admin' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                {/* Load Project */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: '0.9rem', color: '#666' }}>프로젝트 최대:</span>
+                    <input
+                      type="number"
+                      value={projectLimit}
+                      onChange={(e) => setProjectLimit(parseInt(e.target.value) || 1000)}
+                      style={{
+                        width: 80,
+                        padding: '4px 8px',
+                        border: '1px solid #ccc',
+                        borderRadius: 4,
+                        fontSize: '0.9rem'
+                      }}
+                      min="1"
+                      max="10000"
+                    />
+                    <span style={{ fontSize: '0.9rem', color: '#666' }}>개</span>
+                  </div>
+                  <button 
+                    style={{...btnStyle, background: '#dc3545'}} 
+                    onClick={handleLoadProjects}
+                  >
+                    Load Project
+                  </button>
+                </div>
+                
+                {/* Load Issue */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: '0.9rem', color: '#666' }}>이슈 최대:</span>
+                    <input
+                      type="number"
+                      value={issueLimit}
+                      onChange={(e) => setIssueLimit(parseInt(e.target.value) || 1000)}
+                      style={{
+                        width: 80,
+                        padding: '4px 8px',
+                        border: '1px solid #ccc',
+                        borderRadius: 4,
+                        fontSize: '0.9rem'
+                      }}
+                      min="1"
+                      max="10000"
+                    />
+                    <span style={{ fontSize: '0.9rem', color: '#666' }}>개</span>
+                  </div>
+                  <button 
+                    style={{...btnStyle, background: '#dc3545'}} 
+                    onClick={handleLoadIssues}
+                  >
+                    Load Issue
+                  </button>
+                </div>
+              </div>
+            )}
             <button style={btnStyle} onClick={handleSave}>save</button>
             <button style={btnStyle} onClick={handleExit}>exit</button>
           </div>
