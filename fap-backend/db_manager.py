@@ -14,7 +14,7 @@ from config import REDMINE_URL, API_KEY, CUSTOMER_PROJECT_IDS, ATI_PROJECT_IDS
 class DatabaseManager:
     """레드마인 일감 데이터베이스 관리자"""
     
-    def __init__(self):
+    def __init__(self):  # 수정 불가
         """데이터베이스 연결 설정 초기화"""
         self.db_config = {
             'host': 'localhost',
@@ -25,7 +25,7 @@ class DatabaseManager:
             'charset': 'utf8mb4'
         }
     
-    def get_connection(self):
+    def get_connection(self):  # 수정 불가
         """데이터베이스 연결 반환"""
         try:
             conn = pymysql.connect(**self.db_config)
@@ -34,7 +34,7 @@ class DatabaseManager:
             print(f"DB 연결 실패: {e}")
             return None
     
-    def update_projects_table_structure(self) -> bool:
+    def update_projects_table_structure(self) -> bool:  # 수정 불가
         """프로젝트 테이블 구조를 7개 컬럼으로 업데이트"""
         conn = self.get_connection()
         if not conn:
@@ -67,8 +67,10 @@ class DatabaseManager:
             return False
         finally:
             conn.close()
+
+# ===== 일감 관련 메서드들 =====        
     
-    def _parse_issue_data(self, raw_data: str) -> Dict:
+    def _parse_issue_data(self, raw_data: str) -> Dict:  # 수정 불가
         """raw_data JSON 문자열을 파싱하여 딕셔너리로 변환"""
         if raw_data:
             try:
@@ -77,7 +79,7 @@ class DatabaseManager:
                 return {}
         return {}
     
-    def _row_to_issue_dict(self, row) -> Dict:
+    def _row_to_issue_dict(self, row) -> Dict:  # 수정 불가
         """데이터베이스 행을 일감 딕셔너리로 변환"""
         issue = {
             'id': row[0],
@@ -89,9 +91,7 @@ class DatabaseManager:
         issue['data'] = self._parse_issue_data(issue['raw_data'])
         return issue
     
-
-
-    def sync_recent_issues(self, limit: int = 100) -> Dict:
+    def sync_recent_issues(self, limit: int = 100) -> Dict:  # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (50개씩 병렬 처리, 기존 DB 삭제 후 새로 추가)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -219,9 +219,9 @@ class DatabaseManager:
                 'count': 0
             }
 
-    # ===== 프로젝트 관련 메서드들 =====
+# ===== 프로젝트 관련 메서드들 =====
     
-    def _row_to_project_dict(self, row) -> Dict:
+    def _row_to_project_dict(self, row) -> Dict:  # 수정 불가
         """데이터베이스 행을 프로젝트 딕셔너리로 변환"""
         project = {
             'id': row[0],
@@ -235,12 +235,8 @@ class DatabaseManager:
         }
         project['data'] = self._parse_issue_data(project['raw_data'])  # 일감과 동일한 방식
         return project
-    
-
-    
-
-
-    def sync_projects(self, limit: int = 1000) -> Dict:
+      
+    def sync_projects(self, limit: int = 1000) -> Dict:  # 수정 불가
         """레드마인에서 프로젝트 목록을 가져와서 DB에 저장 (50개씩 병렬 처리)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -367,6 +363,8 @@ class DatabaseManager:
                             level = 11
                         elif redmine_project_id == ATI_PROJECT_IDS['ATI_SAMPLE_EVALUATION']:  # ATI 시료 평가
                             level = 21
+                        elif redmine_project_id == ATI_PROJECT_IDS['ATI_GUIDE']:  # PMS System 안내
+                            level = 31
                         else:
                             # 레벨 설정 로직
                             if parent_id is None:
@@ -413,3 +411,35 @@ class DatabaseManager:
                 'error': f'프로젝트 동기화 실패: {str(e)}',
                 'count': 0
             }
+
+    def get_projects_by_ids(self, project_ids: List[int]) -> List[Dict]:  # 수정 불가
+        """프로젝트 ID 리스트로 해당 프로젝트들의 전체 정보 조회"""
+        if not project_ids:
+            return []
+        
+        conn = self.get_connection()
+        if not conn:
+            return []
+        
+        try:
+            cursor = conn.cursor()
+            
+            # ID 리스트를 문자열로 변환하여 IN 절에 사용
+            id_placeholders = ','.join(['%s'] * len(project_ids))
+            query = f"""
+                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at 
+                FROM projects 
+                WHERE redmine_project_id IN ({id_placeholders})
+                ORDER BY project_name ASC
+            """
+            
+            cursor.execute(query, project_ids)
+            rows = cursor.fetchall()
+            
+            return [self._row_to_project_dict(row) for row in rows]
+            
+        except Exception as e:
+            print(f"프로젝트 ID별 조회 실패: {e}")
+            return []
+        finally:
+            conn.close()

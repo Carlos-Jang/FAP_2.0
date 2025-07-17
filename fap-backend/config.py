@@ -18,8 +18,6 @@ HELP_GPT_PROJECT_ID = "help-gpt"
 
 # 고객사(Level 1) 프로젝트 ID 목록
 CUSTOMER_PROJECT_IDS = [
-    422,  # PMS System 안내
-    9,    # 00. ATI 본사
     100,  # 01. 삼성전자
     265,  # 02. 하이닉스
     432,  # 03. Micron
@@ -45,4 +43,5 @@ CUSTOMER_PROJECT_IDS = [
 ATI_PROJECT_IDS = {
     'ATI_HEADQUARTERS': 9,      # 00. ATI 본사 (Level 11)
     'ATI_SAMPLE_EVALUATION': 846,  # ATI 시료 평가 (Level 21)
+    'ATI_GUIDE': 422,           # PMS System 안내 (Level 31)
 }  # 'Help GPT' 프로젝트의 Redmine ID

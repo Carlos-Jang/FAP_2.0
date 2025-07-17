@@ -25,15 +25,15 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.get("/")
-async def read_root():
+async def read_root():  # 수정 불가
     return {"message": "Hello FAP 2.0!"}
 
 @app.get("/api/health")
-async def health_check():
+async def health_check():  # 수정 불가
     return {"status": "ok"}
 
 @app.post("/api/login")
-async def login(req: LoginRequest):
+async def login(req: LoginRequest):  # 수정 불가
     # Redmine REST API endpoint (예시: /users/current.json)
     url = "https://pms.ati2000.co.kr/users/current.json"
     try:
