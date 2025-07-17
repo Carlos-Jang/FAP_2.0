@@ -63,6 +63,20 @@ CREATE TABLE issues (
 );
 ```
 
+### projects 테이블
+```sql
+CREATE TABLE projects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    redmine_project_id INT NOT NULL UNIQUE,
+    project_name VARCHAR(255) NOT NULL,
+    raw_data JSON,
+    children_ids JSON,  -- 하위 프로젝트 ID 배열
+    level INT DEFAULT 0, -- 프로젝트 계층 레벨 (0: 최상위, 1: 하위)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
 ## 개발 가이드
 
 ### 새로운 API 추가

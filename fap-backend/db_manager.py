@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 import json
 from datetime import datetime
 import requests
-from config import REDMINE_URL, API_KEY
+from config import REDMINE_URL, API_KEY, CUSTOMER_PROJECT_IDS, ATI_PROJECT_IDS
 
 
 class DatabaseManager:
@@ -34,6 +34,40 @@ class DatabaseManager:
             print(f"DB 연결 실패: {e}")
             return None
     
+    def update_projects_table_structure(self) -> bool:
+        """프로젝트 테이블 구조를 7개 컬럼으로 업데이트"""
+        conn = self.get_connection()
+        if not conn:
+            return False
+        
+        try:
+            cursor = conn.cursor()
+            
+            # children_ids 컬럼이 있는지 확인
+            cursor.execute("SHOW COLUMNS FROM projects LIKE 'children_ids'")
+            if not cursor.fetchone():
+                print("children_ids 컬럼 추가 중...")
+                cursor.execute("ALTER TABLE projects ADD COLUMN children_ids JSON AFTER raw_data")
+            
+            # level 컬럼이 있는지 확인
+            cursor.execute("SHOW COLUMNS FROM projects LIKE 'level'")
+            if not cursor.fetchone():
+                print("level 컬럼 추가 중...")
+                cursor.execute("ALTER TABLE projects ADD COLUMN level INT DEFAULT 0 AFTER children_ids")
+            
+            # 기존 데이터의 level을 0으로 설정
+            cursor.execute("UPDATE projects SET level = 0 WHERE level IS NULL")
+            
+            conn.commit()
+            print("프로젝트 테이블 구조 업데이트 완료")
+            return True
+            
+        except Exception as e:
+            print(f"테이블 구조 업데이트 실패: {e}")
+            return False
+        finally:
+            conn.close()
+    
     def _parse_issue_data(self, raw_data: str) -> Dict:
         """raw_data JSON 문자열을 파싱하여 딕셔너리로 변환"""
         if raw_data:
@@ -55,100 +89,7 @@ class DatabaseManager:
         issue['data'] = self._parse_issue_data(issue['raw_data'])
         return issue
     
-    def get_all_issues(self, limit: int = 100, offset: int = 0) -> List[Dict]:
-        """모든 일감 정보 조회 (페이지네이션 지원)"""
-        conn = self.get_connection()
-        if not conn:
-            return []
-        
-        try:
-            cursor = conn.cursor()
-            query = """
-                SELECT id, redmine_id, raw_data, created_at, updated_at 
-                FROM issues 
-                ORDER BY updated_at DESC 
-                LIMIT %s OFFSET %s
-            """
-            cursor.execute(query, (limit, offset))
-            rows = cursor.fetchall()
-            
-            return [self._row_to_issue_dict(row) for row in rows]
-            
-        except Exception as e:
-            print(f"일감 조회 실패: {e}")
-            return []
-        finally:
-            conn.close()
-    
-    def get_issue_count(self) -> int:
-        """전체 일감 개수 조회"""
-        conn = self.get_connection()
-        if not conn:
-            return 0
-        
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM issues")
-            result = cursor.fetchone()
-            return result[0] if result else 0
-            
-        except Exception as e:
-            print(f"일감 개수 조회 실패: {e}")
-            return 0
-        finally:
-            conn.close()
-    
-    def get_issue_by_id(self, issue_id: int) -> Optional[Dict]:
-        """특정 일감 조회 (Redmine ID 기준)"""
-        conn = self.get_connection()
-        if not conn:
-            return None
-        
-        try:
-            cursor = conn.cursor()
-            query = "SELECT * FROM issues WHERE redmine_id = %s"
-            cursor.execute(query, (issue_id,))
-            row = cursor.fetchone()
-            
-            return self._row_to_issue_dict(row) if row else None
-            
-        except Exception as e:
-            print(f"일감 조회 실패: {e}")
-            return None
-        finally:
-            conn.close()
-    
-    def search_issues(self, keyword: str, limit: int = 100) -> List[Dict]:
-        """일감 검색 (제목, 설명에서 키워드 검색)"""
-        conn = self.get_connection()
-        if not conn:
-            return []
-        
-        try:
-            cursor = conn.cursor()
-            # 대소문자 구분 없이 검색하고, JSON 내부의 subject와 description 필드도 검색
-            query = """
-                SELECT id, redmine_id, raw_data, created_at, updated_at 
-                FROM issues 
-                WHERE LOWER(raw_data) LIKE LOWER(%s) 
-                   OR LOWER(raw_data) LIKE LOWER(%s)
-                   OR LOWER(raw_data) LIKE LOWER(%s)
-                ORDER BY updated_at DESC 
-                LIMIT %s
-            """
-            search_pattern = f"%{keyword}%"
-            subject_pattern = f"%\"subject\":\"%{keyword}%\"%"
-            desc_pattern = f"%\"description\":\"%{keyword}%\"%"
-            cursor.execute(query, (search_pattern, subject_pattern, desc_pattern, limit))
-            rows = cursor.fetchall()
-            
-            return [self._row_to_issue_dict(row) for row in rows]
-            
-        except Exception as e:
-            print(f"일감 검색 실패: {e}")
-            return []
-        finally:
-            conn.close()
+
 
     def sync_recent_issues(self, limit: int = 100) -> Dict:
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (50개씩 병렬 처리, 기존 DB 삭제 후 새로 추가)"""
@@ -287,79 +228,25 @@ class DatabaseManager:
             'redmine_project_id': row[1],
             'project_name': row[2],
             'raw_data': row[3],
-            'created_at': row[4],
-            'updated_at': row[5]
+            'children_ids': row[4],  # 새로 추가된 컬럼
+            'level': row[5],         # 새로 추가된 컬럼
+            'created_at': row[6],
+            'updated_at': row[7]
         }
         project['data'] = self._parse_issue_data(project['raw_data'])  # 일감과 동일한 방식
         return project
     
-    def get_all_projects(self, limit: int = 100, offset: int = 0) -> List[Dict]:
-        """모든 프로젝트 정보 조회 (페이지네이션 지원)"""
-        conn = self.get_connection()
-        if not conn:
-            return []
-        
-        try:
-            cursor = conn.cursor()
-            query = """
-                SELECT id, redmine_project_id, project_name, raw_data, created_at, updated_at 
-                FROM projects 
-                ORDER BY project_name ASC 
-                LIMIT %s OFFSET %s
-            """
-            cursor.execute(query, (limit, offset))
-            rows = cursor.fetchall()
-            
-            return [self._row_to_project_dict(row) for row in rows]
-            
-        except Exception as e:
-            print(f"프로젝트 조회 실패: {e}")
-            return []
-        finally:
-            conn.close()
+
     
-    def get_project_count(self) -> int:
-        """전체 프로젝트 개수 조회"""
-        conn = self.get_connection()
-        if not conn:
-            return 0
-        
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM projects")
-            result = cursor.fetchone()
-            return result[0] if result else 0
-            
-        except Exception as e:
-            print(f"프로젝트 개수 조회 실패: {e}")
-            return 0
-        finally:
-            conn.close()
-    
-    def get_project_by_id(self, project_id: int) -> Optional[Dict]:
-        """특정 프로젝트 조회 (Redmine 프로젝트 ID 기준)"""
-        conn = self.get_connection()
-        if not conn:
-            return None
-        
-        try:
-            cursor = conn.cursor()
-            query = "SELECT id, redmine_project_id, project_name, raw_data, created_at, updated_at FROM projects WHERE redmine_project_id = %s"
-            cursor.execute(query, (project_id,))
-            row = cursor.fetchone()
-            
-            return self._row_to_project_dict(row) if row else None
-            
-        except Exception as e:
-            print(f"프로젝트 조회 실패: {e}")
-            return None
-        finally:
-            conn.close()
+
 
     def sync_projects(self, limit: int = 1000) -> Dict:
         """레드마인에서 프로젝트 목록을 가져와서 DB에 저장 (50개씩 병렬 처리)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            # 테이블 구조 업데이트 확인
+            self.update_projects_table_structure()
             
             print(f"레드마인 API 병렬 호출 중... (50개씩 배치 처리)")
             
@@ -458,11 +345,55 @@ class DatabaseManager:
                 if not redmine_project_id or not project_name:
                     continue
                 
-                # 새 프로젝트 추가 (전체 JSON 저장)
+
+                
+                # 하위 프로젝트 ID들 가져오기
+                children_ids = []
+                level = 1  # 기본값: 최상위 프로젝트
+                
+                # Redmine API로 하위 프로젝트 조회
+                try:
+                    children_url = f"{REDMINE_URL}/projects.json?parent_id={redmine_project_id}"
+                    children_response = requests.get(children_url, params={'key': API_KEY}, timeout=10)
+                    if children_response.status_code == 200:
+                        children_data = children_response.json()
+                        children_ids = [child.get('id') for child in children_data.get('projects', [])]
+                        
+                        # 부모 프로젝트 정보 확인
+                        parent_id = project.get('parent', {}).get('id')
+                        
+                        # 특정 프로젝트 하드코딩 레벨 설정
+                        if redmine_project_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 00. ATI 본사
+                            level = 11
+                        elif redmine_project_id == ATI_PROJECT_IDS['ATI_SAMPLE_EVALUATION']:  # ATI 시료 평가
+                            level = 21
+                        else:
+                            # 레벨 설정 로직
+                            if parent_id is None:
+                                level = 1  # 최상위 (고객사)
+                            elif parent_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 부모가 00. ATI 본사인 경우
+                                level = 12
+                            elif not children_ids:
+                                level = 4  # 최하위 (설비/라인)
+                            elif parent_id in CUSTOMER_PROJECT_IDS:
+                                level = 2  # 고객사의 직접 하위 (지역)
+                            else:
+                                level = 3  # 지역의 하위 (건물명)
+                                
+                except Exception as e:
+                    print(f"프로젝트 {redmine_project_id} 하위 프로젝트 조회 실패: {e}")
+                
+                # 새 프로젝트 추가 (7개 컬럼 모두 저장)
                 cursor.execute("""
-                    INSERT INTO projects (redmine_project_id, project_name, raw_data, created_at, updated_at) 
-                    VALUES (%s, %s, %s, NOW(), NOW())
-                """, (redmine_project_id, project_name, json.dumps(project, ensure_ascii=False)))
+                    INSERT INTO projects (redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at) 
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                """, (
+                    redmine_project_id, 
+                    project_name, 
+                    json.dumps(project, ensure_ascii=False),
+                    json.dumps(children_ids, ensure_ascii=False),
+                    level
+                ))
                 saved_count += 1
             
             conn.commit()

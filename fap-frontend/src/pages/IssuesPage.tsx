@@ -8,11 +8,23 @@ const VIEW_TABS = [
   { key: 'member', label: '인원 분석' },
 ];
 
-// SITE 버튼 정보 선언
-const SITE_BUTTONS = [
-  { name: 'Samsung', identifier: 'samsung' },
-  { name: 'Hynix', identifier: 'hynix' },
-];
+// 고객사 프로젝트 타입 정의
+interface CustomerProject {
+  id: number;
+  redmine_project_id: number;
+  project_name: string;
+  children_ids: string;
+  level: number;
+}
+
+// 하위 프로젝트 타입 정의
+interface SubProject {
+  id: number;
+  redmine_project_id: number;
+  project_name: string;
+  children_ids: string;
+  level: number;
+}
 
 // 하위 프로젝트 이름에서 괄호와 괄호 안의 내용을 제거하는 함수
 const getDisplayName = (name: string) => name.replace(/\s*\(.*?\)/g, '').trim();
@@ -31,41 +43,66 @@ export default function IssuesPage() {
   const [dateFrom, setDateFrom] = useState(getWeekAgo());
   const [dateTo, setDateTo] = useState(getToday());
   const [activeView, setActiveView] = useState('issue');
-  const [selectedSite, setSelectedSite] = useState<string>('samsung');
-  const [subProjects, setSubProjects] = useState<any[]>([]);
+  const [customerProjects, setCustomerProjects] = useState<CustomerProject[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>('');
+  const [subProjects, setSubProjects] = useState<SubProject[]>([]);
   const [selectedSubProject, setSelectedSubProject] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [productGroups, setProductGroups] = useState<string[]>([]);
   const [selectedProductGroup, setSelectedProductGroup] = useState<string>('all');
 
+  // 고객사 프로젝트 목록 가져오기 (Level 1)
+  const fetchCustomerProjects = async () => {
+    try {
+      const response = await fetch('/api/issues/projects?level=1');
+      if (response.ok) {
+        const data = await response.json();
+        setCustomerProjects(data.projects || []);
+        // 첫 번째 고객사 자동 선택
+        if (data.projects && data.projects.length > 0) {
+          const firstCustomer = data.projects[0];
+          setSelectedSite(firstCustomer.redmine_project_id.toString());
+          handleSiteClick(firstCustomer.redmine_project_id.toString());
+        }
+      }
+    } catch (error) {
+      console.error('고객사 프로젝트 조회 오류:', error);
+    }
+  };
+
   // SITE 버튼 클릭 핸들러
-  const handleSiteClick = async (siteIdentifier: string) => {
-    setSelectedSite(siteIdentifier);
+  const handleSiteClick = async (siteId: string) => {
+    setSelectedSite(siteId);
     setSelectedSubProject('all');
     setLoading(true);
     
     try {
-      // 하위 프로젝트 리스트 가져오기 (백엔드 캐시 사용)
-      const response = await fetch(`/api/projects/sub-projects/${siteIdentifier}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSubProjects(data.projects || []);
-      } else {
-        setSubProjects([]);
-        console.error('하위 프로젝트 조회 실패');
+      // 선택된 고객사의 하위 프로젝트들 조회
+      const selectedCustomer = customerProjects.find(c => c.redmine_project_id.toString() === siteId);
+      if (selectedCustomer) {
+        const childrenIds = JSON.parse(selectedCustomer.children_ids);
+        if (childrenIds.length > 0) {
+          // 하위 프로젝트 정보들 조회
+          const subProjectPromises = childrenIds.map((id: number) => 
+            fetch(`/api/issues/projects/${id}`).then(res => res.json())
+          );
+          const subProjectResults = await Promise.all(subProjectPromises);
+          setSubProjects(subProjectResults.map(result => result.project));
+        } else {
+          setSubProjects([]);
+        }
       }
     } catch (error) {
       setSubProjects([]);
-      console.error('API 호출 오류:', error);
+      console.error('하위 프로젝트 조회 오류:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 페이지 로드 시 Samsung의 하위 프로젝트 자동 로드
+  // 페이지 로드 시 고객사 목록 가져오기
   useEffect(() => {
-    handleSiteClick('samsung');
-    setSelectedSubProject('all');
+    fetchCustomerProjects();
   }, []);
 
   // 세부 위치(하위 프로젝트) 선택 시 설비군 리스트 받아오기 (백엔드 캐시 사용)
@@ -142,33 +179,37 @@ export default function IssuesPage() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'row', gap: 16, minHeight: 0 }}>
             {/* Site 컬럼 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 140 }}>
-              {SITE_BUTTONS.map(site => (
-                <button
-                  key={site.identifier}
-                  onClick={() => handleSiteClick(site.identifier)}
-                  style={{
-                    width: '140px',
-                    height: '48px',
-                    fontWeight: 700,
-                    fontSize: '1.08rem',
-                    padding: '0 16px',
-                    borderRadius: 6,
-                    background: selectedSite === site.identifier ? '#28313b' : '#e5e8ef',
-                    color: selectedSite === site.identifier ? '#fff' : '#222',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: 'none',
-                    outline: 'none',
-                    transition: 'all 0.15s',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start'
-                  }}
-                >
-                  {site.name}
-                </button>
-              ))}
+              {customerProjects.map((customer: CustomerProject) => {
+                // "01. 삼성전자" -> "삼성전자"로 변환
+                const displayName = customer.project_name.replace(/^\d+\.\s*/, '');
+                return (
+                  <button
+                    key={customer.redmine_project_id}
+                    onClick={() => handleSiteClick(customer.redmine_project_id.toString())}
+                    style={{
+                      width: '140px',
+                      height: '48px',
+                      fontWeight: 700,
+                      fontSize: '1.08rem',
+                      padding: '0 16px',
+                      borderRadius: 6,
+                      background: selectedSite === customer.redmine_project_id.toString() ? '#28313b' : '#e5e8ef',
+                      color: selectedSite === customer.redmine_project_id.toString() ? '#fff' : '#222',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: 'none',
+                      outline: 'none',
+                      transition: 'all 0.15s',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start'
+                    }}
+                  >
+                    {displayName}
+                  </button>
+                );
+              })}
             </div>
             {/* 세부 위치(하위 프로젝트) 컬럼 스크롤 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 140, flex: 1, maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
@@ -198,10 +239,10 @@ export default function IssuesPage() {
               >
                 ALL
               </button>
-              {subProjects.map(project => (
+              {subProjects.map((project: SubProject) => (
                 <button
-                  key={project.id}
-                  onClick={() => setSelectedSubProject(project.id.toString())}
+                  key={project.redmine_project_id}
+                  onClick={() => setSelectedSubProject(project.redmine_project_id.toString())}
                   style={{
                     width: '140px',
                     height: '48px',
@@ -209,8 +250,8 @@ export default function IssuesPage() {
                     fontSize: '1.08rem',
                     padding: '0 16px',
                     borderRadius: 6,
-                    background: selectedSubProject === project.id.toString() ? '#28313b' : '#e5e8ef',
-                    color: selectedSubProject === project.id.toString() ? '#fff' : '#222',
+                    background: selectedSubProject === project.redmine_project_id.toString() ? '#28313b' : '#e5e8ef',
+                    color: selectedSubProject === project.redmine_project_id.toString() ? '#fff' : '#222',
                     border: 'none',
                     cursor: 'pointer',
                     boxShadow: 'none',
@@ -222,7 +263,7 @@ export default function IssuesPage() {
                     justifyContent: 'flex-start'
                   }}
                 >
-                  {getDisplayName(project.name)}
+                  {getDisplayName(project.project_name)}
                 </button>
               ))}
             </div>
