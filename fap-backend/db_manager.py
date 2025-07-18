@@ -443,3 +443,33 @@ class DatabaseManager:
             return []
         finally:
             conn.close()
+
+    def get_projects_by_name(self, project_name: str) -> List[Dict]: # 수정 불가
+        """프로젝트 이름으로 프로젝트 정보 조회"""
+        if not project_name:
+            return []
+        
+        conn = self.get_connection()
+        if not conn:
+            return []
+        
+        try:
+            cursor = conn.cursor()
+            
+            query = """
+                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at 
+                FROM projects 
+                WHERE project_name = %s
+                ORDER BY project_name ASC
+            """
+            
+            cursor.execute(query, (project_name,))
+            rows = cursor.fetchall()
+            
+            return [self._row_to_project_dict(row) for row in rows]
+            
+        except Exception as e:
+            print(f"프로젝트 이름별 조회 실패: {e}")
+            return []
+        finally:
+            conn.close()
