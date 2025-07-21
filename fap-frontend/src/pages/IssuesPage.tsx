@@ -83,6 +83,24 @@ export default function IssuesPage() {
     setSelectedProduct('');
     
     if (subSiteName === 'ALL') {
+      // ALL 선택 시 모든 Sub Site List를 백엔드로 전송
+      try {
+        const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
+        const response = await fetch('/api/issues/get-all-product-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sub_site_list: subSiteNames })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setProductList(data.product_list || []);
+          }
+        }
+      } catch (error) {
+        console.error('전체 Product List 조회 오류:', error);
+        setProductList([]);
+      }
       return;
     }
     
@@ -121,19 +139,19 @@ export default function IssuesPage() {
           </div>
 
                     {/* SITE & Sub Site & Product List 버튼 영역 */}
-          <div style={{ display: 'flex', gap: 16, flex: 1 }}>
+          <div style={{ display: 'flex', gap: 0, flex: 1 }}>
             {/* SITE 버튼 영역 */}
-            <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100% ) / 3)'  }}>
               <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>SITE</div>
               <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1, width: 'fit-content' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
                   {customerProjects.map((customer: CustomerProject, index: number) => {
                     return (
                       <button
                         key={customer.project_name}
                         onClick={() => handleSiteClick(customer.project_name, index)}
                         style={{
-                          width: '140px',
+                          width: '100%',
                           height: '48px',
                           fontWeight: 700,
                           fontSize: '1.08rem',
@@ -150,6 +168,9 @@ export default function IssuesPage() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'flex-start',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                           flexShrink: 0
                         }}
                       >
@@ -162,10 +183,10 @@ export default function IssuesPage() {
             </div>
             
             {/* Sub Site 버튼 영역 - 항상 고정 위치 */}
-            <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100%) / 3)' }}>
               <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>Sub Site</div>
               <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1, width: 'fit-content' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
                   {subProjects.length > 0 ? (
                     subProjects.map((subProject: CustomerProject) => {
                       return (
@@ -173,7 +194,7 @@ export default function IssuesPage() {
                           key={subProject.project_name}
                           onClick={() => handleSubSiteClick(subProject.project_name)}
                           style={{
-                            width: '140px',
+                            width: '100%',
                             height: '48px',
                             fontWeight: 700,
                             fontSize: '1.08rem',
@@ -210,10 +231,10 @@ export default function IssuesPage() {
             </div>
             
             {/* Product List 버튼 영역 - 항상 고정 위치 */}
-            <div style={{ width: '160px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100%) / 3)'  }}>
               <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>Product List</div>
               <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1, width: 'fit-content' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
                   {productList.length > 0 ? (
                     productList.map((product: ProductItem) => {
                       return (
@@ -221,7 +242,7 @@ export default function IssuesPage() {
                           key={product.name}
                           onClick={() => setSelectedProduct(product.name)}
                           style={{
-                            width: '140px',
+                            width: '100%',
                             height: '48px',
                             fontWeight: 700,
                             fontSize: '1.08rem',

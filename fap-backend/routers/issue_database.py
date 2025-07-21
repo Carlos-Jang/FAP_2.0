@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from typing import List, Dict, Optional
 from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
 import json
 
 # 전역 캐시 변수
-product_cache = []
+product_cache = [] # 수정 불가
+all_product_cache = [] # 수정 불가
 
 def extract_project_ids_and_names(projects: List[Dict]): # 수정 불가
     """프로젝트 리스트에서 ID와 이름만 캐시에 저장하는 헬퍼 함수"""
@@ -190,10 +191,71 @@ async def get_product_list(sub_project_name: str = Query(..., description="SUB �
                         'name': prefix
                     })
         
+        # 9. ALL을 제일 처음에 추가
+        product_list.insert(0, {'name': 'ALL'})
+        
         return {
             "success": True,
             "product_list": product_list
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Product List 조회 실패: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Product List 조회 실패: {str(e)}")
+
+@router.post("/get-all-product-list")
+async def get_all_product_list(request: Request):
+    """모든 Sub Site의 Product List를 가져오는 새로운 API"""
+    try:
+        data = await request.json()
+        sub_site_list = data.get('sub_site_list', [])
+        
+        if not sub_site_list:
+            return {
+                "success": True,
+                "product_list": []
+            }
+        
+        # ALL 전용 캐시 초기화
+        global all_product_cache
+        all_product_cache = []
+        
+        # 각 Sub Site마다 get_product_list 함수 호출하여 캐시 내용 수집
+        for sub_site_name in sub_site_list:
+            # get_product_list 함수의 로직을 직접 호출하여 캐시에 저장
+            from .issue_database import get_product_list
+            from fastapi import Query
+            
+            # get_product_list 함수 호출 (캐시에 저장됨)
+            result = await get_product_list(sub_project_name=sub_site_name)
+            
+            # 현재 product_cache 내용을 all_product_cache에 추가
+            from .issue_database import product_cache
+            all_product_cache.extend(product_cache)
+        
+        # for문이 끝나면 all_product_cache를 ALL Product List 캐시에 저장
+        # (이미 all_product_cache에 저장되어 있음)
+        
+        # 중복 제거하여 Product List 생성
+        product_list = []
+        import re
+        
+        for project in all_product_cache:
+            project_name = project.get('project_name', '')
+            match = re.match(r'^(.+?)\s+#\d+', project_name)
+            if match:
+                prefix = match.group(1).strip()
+                if prefix not in [p.get('name') for p in product_list]:
+                    product_list.append({
+                        'name': prefix
+                    })
+        
+        # ALL을 제일 처음에 추가
+        product_list.insert(0, {'name': 'ALL'})
+        
+        return {
+            "success": True,
+            "product_list": product_list
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"전체 Product List 조회 실패: {str(e)}") 
 
