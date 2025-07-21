@@ -25,7 +25,8 @@ async def sync_issues(limit: int = Query(100, ge=1, le=10000, description="동�
     """레드마인에서 일감 동기화"""
     try:
         db = DatabaseManager()
-        result = db.sync_recent_issues(limit)
+        # result = db.sync_recent_issues(limit)  # 기존 함수 주석 처리
+        result = db.sync_recent_issues_full_data(limit)  # 새로운 함수로 테스트
         
         if result['success']:
             return {
@@ -202,7 +203,7 @@ async def get_product_list(sub_project_name: str = Query(..., description="SUB �
         raise HTTPException(status_code=500, detail=f"Product List 조회 실패: {str(e)}")
 
 @router.post("/get-all-product-list")
-async def get_all_product_list(request: Request):
+async def get_all_product_list(request: Request): # 수정 불가
     """모든 Sub Site의 Product List를 가져오는 새로운 API"""
     try:
         data = await request.json()

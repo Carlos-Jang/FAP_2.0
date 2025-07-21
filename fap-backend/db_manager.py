@@ -91,6 +91,46 @@ class DatabaseManager:
         issue['data'] = self._parse_issue_data(issue['raw_data'])
         return issue
     
+    def get_issues_by_date(self, start_date: str, end_date: str) -> List[Dict]:
+        """기간에 해당하는 모든 일감을 가져오는 메서드"""
+        conn = self.get_connection()
+        if not conn:
+            return []
+        
+        try:
+            cursor = conn.cursor()
+            
+            # created_on 또는 updated_on이 지정된 기간에 포함되는 일감들을 조회
+            query = """
+                SELECT raw_data 
+                FROM issues 
+                WHERE (created_on >= %s AND created_on <= %s) 
+                   OR (updated_on >= %s AND updated_on <= %s)
+                ORDER BY created_at DESC
+            """
+            
+            cursor.execute(query, (start_date, end_date, start_date, end_date))
+            rows = cursor.fetchall()
+            
+            # raw_data만 파싱해서 반환
+            issues = []
+            for row in rows:
+                raw_data = row[0]
+                if raw_data:
+                    try:
+                        issue_data = json.loads(raw_data)
+                        issues.append(issue_data)
+                    except json.JSONDecodeError:
+                        continue
+            
+            return issues
+            
+        except Exception as e:
+            print(f"기간별 일감 조회 실패: {e}")
+            return []
+        finally:
+            conn.close()
+    
     def sync_recent_issues(self, limit: int = 100) -> Dict:  # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (50개씩 병렬 처리, 기존 DB 삭제 후 새로 추가)"""
         try:
@@ -199,6 +239,211 @@ class DatabaseManager:
                     INSERT INTO issues (redmine_id, raw_data, created_at, updated_at) 
                     VALUES (%s, %s, NOW(), NOW())
                 """, (redmine_id, json.dumps(issue, ensure_ascii=False)))
+                saved_count += 1
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                'success': True,
+                'message': f'일감 동기화 완료: 기존 {deleted_count}개 삭제, 새로 {saved_count}개 추가',
+                'count': len(all_issues),
+                'saved': saved_count,
+                'deleted': deleted_count
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'일감 동기화 실패: {str(e)}',
+                'count': 0
+            }
+
+    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict:
+        """레드마인에서 최근 일감을 가져와서 DB에 저장 (전체 컬럼 분해 저장, 병렬 처리)"""
+        try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            print(f"레드마인 API 병렬 호출 중... (50개씩 배치 처리)")
+            
+            # 1. 먼저 API 연결 확인
+            test_url = f"{REDMINE_URL}/issues.json"
+            test_params = {'limit': 1, 'key': API_KEY}
+            test_response = requests.get(test_url, params=test_params, timeout=10)
+            
+            if test_response.status_code != 200:
+                return {
+                    'success': False,
+                    'error': f'레드마인 API 연결 실패: {test_response.status_code}',
+                    'count': 0
+                }
+            
+            # 2. 50개씩 나누어서 병렬로 API 호출
+            all_issues = []
+            batch_size = 50
+            offset = 0
+            
+            def fetch_issues_batch(batch_offset):
+                """50개씩 일감을 가져오는 함수"""
+                url = f"{REDMINE_URL}/issues.json"
+                params = {
+                    'limit': batch_size,
+                    'offset': batch_offset,
+                    'sort': 'updated_on:desc',  # 최근 수정된 순으로 정렬
+                    'key': API_KEY
+                }
+                
+                try:
+                    response = requests.get(url, params=params, timeout=30)
+                    if response.status_code == 200:
+                        data = response.json()
+                        issues = data.get('issues', [])
+                        print(f"배치 {batch_offset//batch_size + 1}: {len(issues)}개 일감 가져옴")
+                        return issues
+                    else:
+                        print(f"배치 {batch_offset//batch_size + 1}: API 호출 실패 (status: {response.status_code})")
+                        return []
+                except Exception as e:
+                    print(f"배치 {batch_offset//batch_size + 1}: 에러 - {str(e)}")
+                    return []
+            
+            # 병렬로 여러 배치를 동시에 처리
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = []
+                
+                # 입력받은 limit만큼 배치 계산
+                max_batches = (limit + batch_size - 1) // batch_size  # 올림 나눗셈
+                print(f"총 {max_batches}개 배치를 처리합니다 (최대 {limit}개 일감)")
+                
+                for i in range(max_batches):
+                    batch_offset = i * batch_size
+                    future = executor.submit(fetch_issues_batch, batch_offset)
+                    futures.append(future)
+                
+                # 모든 배치 결과 수집
+                for future in as_completed(futures):
+                    batch_issues = future.result()
+                    if batch_issues:
+                        all_issues.extend(batch_issues)
+                    # 빈 배치가 나와도 계속 진행 (더 많은 데이터가 있을 수 있음)
+            
+            if not all_issues:
+                return {
+                    'success': True,
+                    'message': '동기화할 일감이 없습니다.',
+                    'count': 0
+                }
+            
+            print(f"총 {len(all_issues)}개 일감을 가져왔습니다.")
+            
+            # 3. DB에 저장
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    'success': False,
+                    'error': 'DB 연결 실패',
+                    'count': 0
+                }
+            
+            cursor = conn.cursor()
+            
+            # 기존 issues 테이블 전체 삭제
+            print("기존 일감 데이터 삭제 중...")
+            cursor.execute("DELETE FROM issues")
+            deleted_count = cursor.rowcount
+            print(f"기존 {deleted_count}개 일감 데이터 삭제 완료")
+            
+            # 새로운 일감 데이터 삽입 (컬럼 분해)
+            print("새로운 일감 데이터 삽입 중...")
+            saved_count = 0
+            
+            for issue in all_issues:
+                # 기본 정보 추출
+                redmine_id = issue.get('id')
+                if not redmine_id:
+                    continue
+                
+                # Project 정보
+                project = issue.get('project', {})
+                project_id = project.get('id')
+                project_name = project.get('name', '')
+                
+                # Tracker 정보
+                tracker = issue.get('tracker', {})
+                tracker_id = tracker.get('id')
+                tracker_name = tracker.get('name', '')
+                
+                # Status 정보
+                status = issue.get('status', {})
+                status_id = status.get('id')
+                status_name = status.get('name', '')
+                is_closed = status.get('is_closed', False)
+                
+                # Priority 정보
+                priority = issue.get('priority', {})
+                priority_id = priority.get('id')
+                priority_name = priority.get('name', '')
+                
+                # Author 정보
+                author = issue.get('author', {})
+                author_id = author.get('id')
+                author_name = author.get('name', '')
+                
+                # Assigned to 정보
+                assigned_to = issue.get('assigned_to', {})
+                assigned_to_id = assigned_to.get('id') if assigned_to else None
+                assigned_to_name = assigned_to.get('name', '') if assigned_to else ''
+                
+                # 기본 필드
+                subject = issue.get('subject', '')
+                description = issue.get('description', '')
+                
+                # 커스텀 필드 추출
+                custom_fields = issue.get('custom_fields', [])
+                cost = ''
+                pending = ''
+                product = ''
+                
+                for field in custom_fields:
+                    field_name = field.get('name', '')
+                    field_value = field.get('value', '')
+                    
+                    if '비용' in field_name:
+                        cost = field_value
+                    elif 'pending' in field_name.lower():
+                        pending = field_value
+                    elif '설비군' in field_name or 'product' in field_name.lower():
+                        product = field_value
+                
+                # 시간 정보
+                created_on = issue.get('created_on', '')
+                updated_on = issue.get('updated_on', '')
+                
+                # 새 일감 추가 (모든 컬럼 포함)
+                cursor.execute("""
+                    INSERT INTO issues (
+                        redmine_id, raw_data, created_at, updated_at,
+                        project_id, project_name, tracker_id, tracker_name,
+                        status_id, status_name, is_closed, priority_id, priority_name,
+                        author_id, author_name, assigned_to_id, assigned_to_name,
+                        subject, description, cost, pending, product,
+                        created_on, updated_on
+                    ) VALUES (
+                        %s, %s, NOW(), NOW(),
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s
+                    )
+                """, (
+                    redmine_id, json.dumps(issue, ensure_ascii=False),
+                    project_id, project_name, tracker_id, tracker_name,
+                    status_id, status_name, is_closed, priority_id, priority_name,
+                    author_id, author_name, assigned_to_id, assigned_to_name,
+                    subject, description, cost, pending, product,
+                    created_on, updated_on
+                ))
                 saved_count += 1
             
             conn.commit()
