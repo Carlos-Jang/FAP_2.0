@@ -4,6 +4,23 @@ from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
 import json
 
+def get_overall_issue_status(issues: List[Dict]) -> Dict:
+    """전체 이슈 현황 계산 헬퍼 함수"""
+    total_issues = len(issues)
+    
+    # 완료율 계산
+    completed_count = sum(1 for issue in issues if issue.get('is_closed') == 1)
+    in_progress_count = total_issues - completed_count
+    completion_rate = (completed_count / total_issues * 100) if total_issues > 0 else 0
+    
+    return {
+        "total_issues": total_issues,
+        "completed_count": completed_count,
+        "in_progress_count": in_progress_count,
+        "completion_rate": round(completion_rate, 1)
+    }
+
+
 def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str) -> List[int]: # 수정 불가
     """Site 인덱스, Sub Site, Product 이름으로 해당하는 프로젝트 ID들을 찾는 헬퍼 함수"""
     try:
@@ -551,31 +568,35 @@ async def get_summary_report(request: Request):
         db = DatabaseManager()
         issues = db.get_issues_by_filter(start_date, end_date, project_ids)
         
-        # 주간 업무보고 요약 데이터 생성
-        summary_data = {
-            "total_issues": len(issues),
-            "status_summary": {},
-            "priority_summary": {},
-            "assignee_summary": {}
-        }
+        # 전체 이슈 현황 블럭 생성 (항상 포함)
+        overall_status = get_overall_issue_status(issues)
+        blocks = [{"type": "overall_status", "data": overall_status}]
         
-        # 상태별, 우선순위별, 담당자별 요약
-        for issue in issues:
-            # 상태별 카운트
-            status = issue.get('status_name', 'Unknown')
-            summary_data["status_summary"][status] = summary_data["status_summary"].get(status, 0) + 1
-            
-            # 우선순위별 카운트
-            priority = issue.get('priority_name', 'Unknown')
-            summary_data["priority_summary"][priority] = summary_data["priority_summary"].get(priority, 0) + 1
-            
-            # 담당자별 카운트
-            assignee = issue.get('assigned_to_name', 'Unassigned')
-            summary_data["assignee_summary"][assignee] = summary_data["assignee_summary"].get(assignee, 0) + 1
+        # 조건별 블럭 추가
+        if sub_site_name == "ALL":
+            if product_name == "ALL":
+                # Sub Site ALL + Product List ALL
+                # 기능 1, 기능 2 추가
+                pass
+            else:
+                # Sub Site ALL + Product List 특정
+                # 기능 1, 기능 3 추가
+                pass
+        else:
+            if product_name == "ALL":
+                # Sub Site 특정 + Product List ALL
+                # 기능 1, 기능 4 추가
+                pass
+            else:
+                # Sub Site 특정 + Product List 특정
+                # 기능 1, 기능 5 추가
+                pass
         
         return {
             "success": True,
-            "data": summary_data
+            "data": {
+                "blocks": blocks
+            }
         }
             
     except HTTPException:

@@ -419,52 +419,27 @@ export default function IssuesPage() {
                   <div style={{ width: '100%', height: '100%' }}>
                     <h3>주간 업무보고 요약</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                      {/* 전체 이슈 개수 */}
-                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>전체 이슈 현황</h4>
-                        <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28313b' }}>
-                          {issueData.total_issues}건
-                        </div>
-                      </div>
-                      
-                      {/* 상태별 요약 */}
-                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>상태별 분포</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {Object.entries(issueData.status_summary).map(([status, count]) => (
-                            <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#555' }}>{status}</span>
-                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* 우선순위별 요약 */}
-                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>우선순위별 분포</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {Object.entries(issueData.priority_summary).map(([priority, count]) => (
-                            <div key={priority} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#555' }}>{priority}</span>
-                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* 담당자별 요약 */}
-                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>담당자별 분포</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {Object.entries(issueData.assignee_summary).map(([assignee, count]) => (
-                            <div key={assignee} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#555' }}>{assignee}</span>
-                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      {/* 블럭들을 순서대로 렌더링 */}
+                      {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
+                        switch(block.type) {
+                          case 'overall_status':
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>전체 이슈 현황</h4>
+                                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28313b', marginBottom: 12 }}>
+                                  {block.data.total_issues}건
+                                </div>
+                                <div style={{ display: 'flex', gap: 24, fontSize: '1rem', color: '#555' }}>
+                                  <span>진행 중 일감: <strong style={{ color: '#FF6B6B' }}>{block.data.in_progress_count}건</strong></span>
+                                  <span>완료된 일감: <strong style={{ color: '#4CAF50' }}>{block.data.completed_count}건</strong></span>
+                                  <span>완료율: <strong style={{ color: '#2196F3' }}>{block.data.completion_rate}%</strong></span>
+                                </div>
+                              </div>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
                     </div>
                   </div>
                 ) : '데이터 로딩 중...'

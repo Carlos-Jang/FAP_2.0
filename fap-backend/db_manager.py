@@ -91,7 +91,7 @@ class DatabaseManager:
         issue['data'] = self._parse_issue_data(issue['raw_data'])
         return issue
     
-    def get_issues_by_filter(self, start_date: str, end_date: str, project_ids: List[int]) -> List[Dict]: 
+    def get_issues_by_filter(self, start_date: str, end_date: str, project_ids: List[int]) -> List[Dict]: # 수정 불가
         """기간과 프로젝트 ID로 필터링해서 모든 데이터를 가져오는 메서드"""
         conn = self.get_connection()
         if not conn:
@@ -113,7 +113,6 @@ class DatabaseManager:
                 FROM issues 
                 WHERE updated_on >= %s AND updated_on <= %s
                    AND project_id IN ({id_placeholders})
-                   AND is_closed = FALSE
                 ORDER BY updated_on DESC
             """
             
@@ -319,7 +318,8 @@ class DatabaseManager:
                     'limit': batch_size,
                     'offset': batch_offset,
                     'sort': 'updated_on:desc',  # 최근 수정된 순으로 정렬
-                    'key': API_KEY
+                    'key': API_KEY,
+                    'status_id': '*'  # 모든 상태의 일감 가져오기 (완료, 진행중 모두)
                 }
                 
                 try:
