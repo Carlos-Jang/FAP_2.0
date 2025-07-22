@@ -1,9 +1,10 @@
 import Layout from './Layout';
 import { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const VIEW_TABS = [
-  { key: 'issue', label: '이슈 현황' },
-  { key: 'progress', label: '진행 상황' },
+  { key: 'summary', label: 'summary' },
+  { key: 'progress', label: '일감 요약' },
   { key: 'work', label: '업무 분석' },
   { key: 'member', label: '인원 분석' },
 ];
@@ -31,13 +32,15 @@ function getWeekAgo() {
 export default function IssuesPage() {
   const [dateFrom, setDateFrom] = useState(getWeekAgo());
   const [dateTo, setDateTo] = useState(getToday());
-  const [activeView, setActiveView] = useState('issue');
+  const [activeView, setActiveView] = useState('summary');
   const [customerProjects, setCustomerProjects] = useState<CustomerProject[]>([]);
   const [selectedSite, setSelectedSite] = useState<string>('');
+  const [selectedSiteIndex, setSelectedSiteIndex] = useState<number>(-1);
   const [subProjects, setSubProjects] = useState<CustomerProject[]>([]);
   const [selectedSubSite, setSelectedSubSite] = useState<string>('');
   const [productList, setProductList] = useState<ProductItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [issueData, setIssueData] = useState<any>(null);
 
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
   const fetchCustomerProjects = async () => {
@@ -46,11 +49,11 @@ export default function IssuesPage() {
       if (response.ok) {
         const data = await response.json();
         setCustomerProjects(data.projects || []);
-        // 첫 번째 고객사 자동 선택
-        if (data.projects && data.projects.length > 0) {
-          const firstCustomer = data.projects[0];
-          setSelectedSite(firstCustomer.project_name);
-        }
+        // 첫 번째 고객사 자동 선택 해제
+        // if (data.projects && data.projects.length > 0) {
+        //   const firstCustomer = data.projects[0];
+        //   setSelectedSite(firstCustomer.project_name);
+        // }
       }
     } catch (error) {
       console.error('고객사 프로젝트 조회 오류:', error);
@@ -60,9 +63,11 @@ export default function IssuesPage() {
   // SITE 버튼 클릭 핸들러
   const handleSiteClick = async (siteName: string, siteIndex: number) => {
     setSelectedSite(siteName);
+    setSelectedSiteIndex(siteIndex);
     setSelectedSubSite('');
     setProductList([]);
     setSelectedProduct('');
+    setIssueData(null);
     
     try {
       const response = await fetch(`/api/issues/sub-site?site_index=${siteIndex}`);
@@ -81,6 +86,7 @@ export default function IssuesPage() {
     setSelectedSubSite(subSiteName);
     setProductList([]);
     setSelectedProduct('');
+    setIssueData(null);
     
     if (subSiteName === 'ALL') {
       // ALL 선택 시 모든 Sub Site List를 백엔드로 전송
@@ -115,6 +121,72 @@ export default function IssuesPage() {
     } catch (error) {
       console.error('Product List 조회 오류:', error);
       setProductList([]);
+    }
+  };
+
+  // Product List 선택 핸들러
+  const handleProductClick = async (productName: string) => {
+    setSelectedProduct(productName);
+    setIssueData(null); // 새 데이터 로드 전에 초기화
+    
+    // 현재 활성 탭에 따라 데이터 로드
+    if (activeView === 'progress') {
+      await loadIssueStatusData(productName);
+    } else if (activeView === 'summary') {
+      await loadSummaryReportData(productName);
+    }
+    // 다른 탭들도 나중에 추가
+  };
+
+  // 이슈 현황 데이터 로드
+  const loadIssueStatusData = async (productName: string) => {
+    try {
+      const response = await fetch('/api/issues/get-issue-status-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_index: selectedSiteIndex,
+          sub_site_name: selectedSubSite,
+          product_name: productName
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('이슈 현황 데이터 로드 오류:', error);
+    }
+  };
+
+  // 주간 업무보고 데이터 로드
+  const loadSummaryReportData = async (productName: string) => {
+    try {
+      const response = await fetch('/api/issues/get-summary-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_index: selectedSiteIndex,
+          sub_site_name: selectedSubSite,
+          product_name: productName
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('주간 업무보고 데이터 로드 오류:', error);
     }
   };
 
@@ -240,7 +312,7 @@ export default function IssuesPage() {
                       return (
                         <button
                           key={product.name}
-                          onClick={() => setSelectedProduct(product.name)}
+                          onClick={() => handleProductClick(product.name)}
                           style={{
                             width: '100%',
                             height: '48px',
@@ -287,7 +359,17 @@ export default function IssuesPage() {
             {VIEW_TABS.map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveView(tab.key)}
+                onClick={async () => {
+                  setActiveView(tab.key);
+                  // 탭 변경 시 Product가 선택되어 있으면 데이터 로드
+                  if (selectedProduct && tab.key === 'progress') {
+                    setIssueData(null); // 데이터 초기화
+                    await loadIssueStatusData(selectedProduct);
+                  } else if (selectedProduct && tab.key === 'summary') {
+                    setIssueData(null); // 데이터 초기화
+                    await loadSummaryReportData(selectedProduct);
+                  }
+                }}
                 style={{
                   fontWeight: 700,
                   fontSize: '1.08rem',
@@ -307,10 +389,93 @@ export default function IssuesPage() {
 
           {/* 선택된 뷰에 따른 내용 표시 */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '1.1rem' }}>
-            {activeView === 'issue' && '이슈 현황 내용이 여기에 표시됩니다.'}
-            {activeView === 'progress' && '진행 상황 내용이 여기에 표시됩니다.'}
-            {activeView === 'work' && '업무 분석 내용이 여기에 표시됩니다.'}
-            {activeView === 'member' && '인원 분석 내용이 여기에 표시됩니다.'}
+            {activeView === 'progress' && (
+              selectedProduct ? (
+                issueData ? (
+                  <div style={{ width: '100%', height: '100%' }}>
+                    <h3>이슈 현황 - Tracker별 분포</h3>
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart data={Object.entries(issueData.tracker_counts).map(([name, count]) => ({ name, count }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          interval={0}
+                        />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#28313b" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : '데이터 로딩 중...'
+              ) : '검색 조건을 설정해주세요'
+            )}
+            {activeView === 'summary' && (
+              selectedProduct ? (
+                issueData ? (
+                  <div style={{ width: '100%', height: '100%' }}>
+                    <h3>주간 업무보고 요약</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                      {/* 전체 이슈 개수 */}
+                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>전체 이슈 현황</h4>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28313b' }}>
+                          {issueData.total_issues}건
+                        </div>
+                      </div>
+                      
+                      {/* 상태별 요약 */}
+                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>상태별 분포</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {Object.entries(issueData.status_summary).map(([status, count]) => (
+                            <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#555' }}>{status}</span>
+                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* 우선순위별 요약 */}
+                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>우선순위별 분포</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {Object.entries(issueData.priority_summary).map(([priority, count]) => (
+                            <div key={priority} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#555' }}>{priority}</span>
+                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* 담당자별 요약 */}
+                      <div style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>담당자별 분포</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {Object.entries(issueData.assignee_summary).map(([assignee, count]) => (
+                            <div key={assignee} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#555' }}>{assignee}</span>
+                              <span style={{ fontWeight: 600, color: '#28313b' }}>{count as number}건</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : '데이터 로딩 중...'
+              ) : '검색 조건을 설정해주세요'
+            )}
+            {activeView === 'work' && (
+              selectedProduct ? '업무 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+            )}
+            {activeView === 'member' && (
+              selectedProduct ? '인원 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+            )}
           </div>
         </div>
       </div>

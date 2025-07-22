@@ -91,8 +91,8 @@ class DatabaseManager:
         issue['data'] = self._parse_issue_data(issue['raw_data'])
         return issue
     
-    def get_issues_by_date(self, start_date: str, end_date: str) -> List[Dict]:
-        """기간에 해당하는 모든 일감을 가져오는 메서드"""
+    def get_issues_by_filter(self, start_date: str, end_date: str, project_ids: List[int]) -> List[Dict]: 
+        """기간과 프로젝트 ID로 필터링해서 모든 데이터를 가져오는 메서드"""
         conn = self.get_connection()
         if not conn:
             return []
@@ -100,33 +100,62 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             
-            # created_on 또는 updated_on이 지정된 기간에 포함되는 일감들을 조회
-            query = """
-                SELECT raw_data 
+            # project_ids 리스트를 문자열로 변환하여 IN 절에 사용
+            id_placeholders = ','.join(['%s'] * len(project_ids))
+            
+            # 기간과 프로젝트 ID로 필터링하여 모든 컬럼 조회
+            query = f"""
+                SELECT redmine_id, project_id, project_name, tracker_id, tracker_name,
+                       status_id, status_name, is_closed, priority_id, priority_name,
+                       author_id, author_name, assigned_to_id, assigned_to_name,
+                       subject, description, cost, pending, product,
+                       created_on, updated_on, raw_data
                 FROM issues 
-                WHERE (created_on >= %s AND created_on <= %s) 
-                   OR (updated_on >= %s AND updated_on <= %s)
-                ORDER BY created_at DESC
+                WHERE updated_on >= %s AND updated_on <= %s
+                   AND project_id IN ({id_placeholders})
+                   AND is_closed = FALSE
+                ORDER BY updated_on DESC
             """
             
-            cursor.execute(query, (start_date, end_date, start_date, end_date))
+            # 파라미터 준비 (기간 2개 + 프로젝트 ID들)
+            params = [start_date, end_date] + project_ids
+            
+            cursor.execute(query, params)
             rows = cursor.fetchall()
             
-            # raw_data만 파싱해서 반환
+            # 결과를 딕셔너리 리스트로 변환
             issues = []
             for row in rows:
-                raw_data = row[0]
-                if raw_data:
-                    try:
-                        issue_data = json.loads(raw_data)
-                        issues.append(issue_data)
-                    except json.JSONDecodeError:
-                        continue
+                issue = {
+                    'redmine_id': row[0],
+                    'project_id': row[1],
+                    'project_name': row[2],
+                    'tracker_id': row[3],
+                    'tracker_name': row[4],
+                    'status_id': row[5],
+                    'status_name': row[6],
+                    'is_closed': row[7],
+                    'priority_id': row[8],
+                    'priority_name': row[9],
+                    'author_id': row[10],
+                    'author_name': row[11],
+                    'assigned_to_id': row[12],
+                    'assigned_to_name': row[13],
+                    'subject': row[14],
+                    'description': row[15],
+                    'cost': row[16],
+                    'pending': row[17],
+                    'product': row[18],
+                    'created_on': row[19],
+                    'updated_on': row[20],
+                    'raw_data': row[21]
+                }
+                issues.append(issue)
             
             return issues
             
         except Exception as e:
-            print(f"기간별 일감 조회 실패: {e}")
+            print(f"필터링된 일감 조회 실패: {e}")
             return []
         finally:
             conn.close()
@@ -259,7 +288,7 @@ class DatabaseManager:
                 'count': 0
             }
 
-    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict:
+    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (전체 컬럼 분해 저장, 병렬 처리)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
