@@ -13,12 +13,268 @@ def get_overall_issue_status(issues: List[Dict]) -> Dict:
     in_progress_count = total_issues - completed_count
     completion_rate = (completed_count / total_issues * 100) if total_issues > 0 else 0
     
+    # 모든 일감 유형별 카운트 (완료/미완료 구분 없이)
+    tracker_counts = {}
+    for issue in issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        # 대괄호 제거하고 깔끔한 이름으로 변환
+        clean_name = tracker_name.replace('[AE][이슈] ', '').replace('[AE][Setup] ', '').replace('[AE] ', '')
+        tracker_counts[clean_name] = tracker_counts.get(clean_name, 0) + 1
+    
+    # tracker별 텍스트 생성
+    tracker_text_parts = []
+    
+    for tracker_name, count in tracker_counts.items():
+        # tracker별 고정 색상 매핑
+        if 'HW' in tracker_name:
+            color = '#FF6B6B'  # 빨간색
+        elif 'SW' in tracker_name:
+            color = '#4CAF50'  # 초록색
+        elif 'AE' in tracker_name:
+            color = '#2196F3'  # 파란색
+        else:
+            color = '#222222'  # 검정색
+        
+        # 모든 tracker를 동일한 폰트 크기로 표시
+        tracker_text_parts.append(f'<span style="color: {color}">{tracker_name}: {count}건</span>')
+    
+    # 3개씩 그룹으로 나누어서 줄바꿈
+    tracker_text = ""
+    for i in range(0, len(tracker_text_parts), 3):
+        group = tracker_text_parts[i:i+3]
+        tracker_text += "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(group)
+        if i + 3 < len(tracker_text_parts):  # 마지막 그룹이 아니면 줄바꿈 추가
+            tracker_text += "<br>"
+    
     return {
         "total_issues": total_issues,
         "completed_count": completed_count,
         "in_progress_count": in_progress_count,
-        "completion_rate": round(completion_rate, 1)
+        "completion_rate": round(completion_rate, 1),
+        "tracker_text": tracker_text
     }
+
+
+def get_most_problematic_products(issues: List[Dict]) -> Dict:
+    """가장 문제가 많은 Product Top 3 계산 헬퍼 함수"""
+    # Product별 통계 계산
+    product_stats = {}
+    
+    for issue in issues:
+        project_name = issue.get('project_name', '')
+        is_closed = issue.get('is_closed', 0)
+        
+        # Product 이름 추출 (예: "설비A #01" -> "설비A")
+        if '#' in project_name:
+            product_name = project_name.split('#')[0].strip()
+        else:
+            product_name = project_name
+        
+        if product_name not in product_stats:
+            product_stats[product_name] = {
+                'in_progress': 0,
+                'completed': 0,
+                'total': 0
+            }
+        
+        product_stats[product_name]['total'] += 1
+        if is_closed == 1:
+            product_stats[product_name]['completed'] += 1
+        else:
+            product_stats[product_name]['in_progress'] += 1
+    
+    # 진행중인 일감 수로 정렬하여 Top 3 선별
+    sorted_products = sorted(
+        product_stats.items(), 
+        key=lambda x: x[1]['in_progress'], 
+        reverse=True
+    )[:3]
+    
+    # 결과 데이터 구성
+    problematic_products = []
+    for product_name, stats in sorted_products:
+        completion_rate = (stats['completed'] / stats['total'] * 100) if stats['total'] > 0 else 0
+        problematic_products.append({
+            'product': product_name,
+            'in_progress': stats['in_progress'],
+            'completed': stats['completed'],
+            'completion_rate': round(completion_rate, 1)
+        })
+    
+    return {
+        "type": "problematic_products",
+        "data": problematic_products
+    }
+
+
+def get_most_problematic_sites(site_index: int, start_date: str, end_date: str, product_name: str) -> Dict:
+    """가장 문제가 많은 Site Top 3 계산 헬퍼 함수"""
+    try:
+        db = DatabaseManager()
+        
+        # 1. Site index로 Site ID 찾기
+        site_id = CUSTOMER_PROJECT_IDS[site_index]
+        site_project = db.get_projects_by_ids([site_id])[0]
+        
+        # 2. Site의 하위 프로젝트 정보 조회
+        children_ids = site_project.get('children_ids', [])
+        if isinstance(children_ids, str):
+            children_ids = json.loads(children_ids)
+        
+        sub_projects = db.get_projects_by_ids(children_ids)
+        
+        # 3. 각 Sub Site별로 통계 계산
+        site_stats = []
+        for sub_project in sub_projects:
+            sub_site_name = sub_project.get('project_name')
+            
+            # 해당 Sub Site의 모든 Product 프로젝트 ID 가져오기
+            project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+            
+            # 이슈 데이터 조회
+            issues = db.get_issues_by_filter(start_date, end_date, project_ids)
+            
+            # Sub Site별 통계 계산
+            stats = get_overall_issue_status(issues)
+            
+            # 진행 중이거나 완료된 일감이 있는 경우만 추가
+            if stats['in_progress_count'] > 0 or stats['completed_count'] > 0:
+                # 툴팁 정보 생성
+                tooltip_info = generate_site_tooltip(issues)
+                
+                site_stats.append({
+                    'site': sub_site_name,
+                    'in_progress': stats['in_progress_count'],
+                    'completed': stats['completed_count'],
+                    'completion_rate': stats['completion_rate'],
+                    'tooltip': tooltip_info
+                })
+        
+        # 4. 진행중인 일감 수로 정렬
+        sorted_sites = sorted(site_stats, key=lambda x: x['in_progress'], reverse=True)
+        
+        return {
+            "type": "problematic_sites",
+            "data": sorted_sites
+        }
+        
+    except Exception as e:
+        return {
+            "type": "problematic_sites",
+            "data": []
+        }
+
+
+def generate_site_tooltip(issues: List[Dict]) -> str:
+    """이슈 데이터를 받아서 Site 툴팁용 요약 텍스트를 생성하는 헬퍼 함수"""
+    # 완료된 일감과 미완료 일감 분리
+    completed_issues = [issue for issue in issues if issue.get('is_closed') == 1]
+    in_progress_issues = [issue for issue in issues if issue.get('is_closed') == 0]
+    
+    # 완료된 일감 tracker_name별로 카운트
+    completed_tracker_counts = {}
+    for issue in completed_issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        completed_tracker_counts[tracker_name] = completed_tracker_counts.get(tracker_name, 0) + 1
+    
+    # 미완료 일감 tracker_name별로 카운트
+    in_progress_tracker_counts = {}
+    for issue in in_progress_issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        in_progress_tracker_counts[tracker_name] = in_progress_tracker_counts.get(tracker_name, 0) + 1
+    
+    # 미완료 일감 tracker별 개수를 1줄로 결합
+    in_progress_parts = []
+    
+    for tracker_name, count in in_progress_tracker_counts.items():
+        # 대괄호 제거하고 깔끔한 이름으로 변환
+        clean_name = tracker_name.replace('[AE][이슈] ', '').replace('[AE][Setup] ', '').replace('[AE] ', '')
+        # tracker별 고정 색상 매핑
+        if 'HW' in clean_name:
+            color = '#FF6B6B'  # 빨간색
+        elif 'SW' in clean_name:
+            color = '#4CAF50'  # 초록색
+        elif 'AE' in clean_name:
+            color = '#2196F3'  # 파란색
+        else:
+            color = '#FF9800'  # 주황색
+        # 10건 이상이면 폰트 크기 증가
+        font_size = '1.5rem' if count >= 10 else '1.1rem'
+        in_progress_parts.append(f'<span style="color: {color}; font-size: {font_size}; font-weight: {"bold" if count >= 10 else "normal"}">{clean_name}: {count}건</span>')
+    
+    # 완료된 일감 tracker별 개수를 1줄로 결합
+    completed_parts = []
+    
+    for tracker_name, count in completed_tracker_counts.items():
+        # 대괄호 제거하고 깔끔한 이름으로 변환
+        clean_name = tracker_name.replace('[AE][이슈] ', '').replace('[AE][Setup] ', '').replace('[AE] ', '')
+        # tracker별 고정 색상 매핑
+        if 'HW' in clean_name:
+            color = '#FF6B6B'  # 빨간색
+        elif 'SW' in clean_name:
+            color = '#4CAF50'  # 초록색
+        elif 'AE' in clean_name:
+            color = '#2196F3'  # 파란색
+        else:
+            color = '#FF9800'  # 주황색
+        # 10건 이상이면 폰트 크기 증가
+        font_size = '1.5rem' if count >= 10 else '1.1rem'
+        completed_parts.append(f'<span style="color: {color}; font-size: {font_size}; font-weight: {"bold" if count >= 10 else "normal"}">{clean_name}: {count}건</span>')
+    
+    # 미완료와 완료를 구분해서 표시
+    tooltip_text = ""
+    if in_progress_parts:
+        tooltip_text += f'<div style="margin-bottom: 8px;"><span style="color: #FFFFFF; font-weight: bold;">미완료</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(in_progress_parts) + '</div>'
+    
+    if completed_parts:
+        tooltip_text += f'<div style="margin-bottom: 8px;"><span style="color: #FFFFFF; font-weight: bold;">완료</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(completed_parts) + '</div>'
+    
+    # 각 tracker별 주요 작업 추가
+    tooltip_text += "<br><br>"
+    
+    for tracker_name, count in completed_tracker_counts.items():
+        clean_name = tracker_name.replace('[AE][이슈] ', '').replace('[AE][Setup] ', '').replace('[AE] ', '')
+        # tracker별 고정 색상 매핑
+        if 'HW' in clean_name:
+            color = '#FF6B6B'  # 빨간색
+        elif 'SW' in clean_name:
+            color = '#4CAF50'  # 초록색
+        elif 'AE' in clean_name:
+            color = '#2196F3'  # 파란색
+        else:
+            color = '#FF9800'  # 주황색
+        
+        # 해당 tracker의 일감들 필터링
+        tracker_issues = [issue for issue in completed_issues if issue.get('tracker_name') == tracker_name]
+        
+        tooltip_text += f'<div style="margin-bottom: 8px;"><span style="color: {color}; font-weight: bold; font-size: 1.1rem;">{clean_name} 주요 작업</span><br>'
+        
+        # 상위 3개 일감 제목 추가 (있는 것까지)
+        for i, issue in enumerate(tracker_issues[:3], 1):
+            subject = issue.get('subject', '제목 없음')
+            tooltip_text += f'<span style="font-size: 1.1rem;">{i}. {subject}</span><br>'
+        
+        # 일감이 없는 경우
+        if len(tracker_issues) == 0:
+            tooltip_text += '<span style="font-size: 1.1rem;">완료된 일감이 없습니다.</span><br>'
+        
+        tooltip_text += '</div>'
+    
+    # 등록 인원별 Top 3 추가 (완료된 일감 기준)
+    author_counts = {}
+    for issue in completed_issues:
+        author = issue.get('author_name', 'Unknown')
+        author_counts[author] = author_counts.get(author, 0) + 1
+    
+    # 등록 인원별 Top 3 정렬
+    top_authors = sorted(author_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+    
+    tooltip_text += f'<br><div style="margin-top: 8px;"><span style="color: #9C27B0; font-weight: bold; font-size: 1.1rem;">등록 인원별 Top 3 (완료)</span><br>'
+    for i, (author, count) in enumerate(top_authors, 1):
+        tooltip_text += f'<span style="font-size: 1.1rem;">{i}. {author}: {count}건</span><br>'
+    tooltip_text += '</div>'
+    
+    return tooltip_text
 
 
 def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str) -> List[int]: # 수정 불가
@@ -576,17 +832,23 @@ async def get_summary_report(request: Request):
         if sub_site_name == "ALL":
             if product_name == "ALL":
                 # Sub Site ALL + Product List ALL
-                # 기능 1, 기능 2 추가
-                pass
+                # 가장 문제가 많은 Site Top 3 블럭 추가
+                problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
+                blocks.append(problematic_sites)
+                # 가장 문제가 많은 Product Top 3 블럭 추가
+                problematic_products = get_most_problematic_products(issues)
+                blocks.append(problematic_products)
             else:
                 # Sub Site ALL + Product List 특정
-                # 기능 1, 기능 3 추가
-                pass
+                # 가장 문제가 많은 Site Top 3 블럭 추가
+                problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
+                blocks.append(problematic_sites)
         else:
             if product_name == "ALL":
                 # Sub Site 특정 + Product List ALL
-                # 기능 1, 기능 4 추가
-                pass
+                # 가장 문제가 많은 Product Top 3 블럭 추가
+                problematic_products = get_most_problematic_products(issues)
+                blocks.append(problematic_products)
             else:
                 # Sub Site 특정 + Product List 특정
                 # 기능 1, 기능 5 추가

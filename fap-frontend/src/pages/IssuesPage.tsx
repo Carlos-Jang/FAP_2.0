@@ -388,7 +388,7 @@ export default function IssuesPage() {
           </div>
 
           {/* 선택된 뷰에 따른 내용 표시 */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '1.1rem' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', color: '#888', fontSize: '1.1rem', overflowY: 'auto' }}>
             {activeView === 'progress' && (
               selectedProduct ? (
                 issueData ? (
@@ -416,9 +416,8 @@ export default function IssuesPage() {
             {activeView === 'summary' && (
               selectedProduct ? (
                 issueData ? (
-                  <div style={{ width: '100%', height: '100%' }}>
-                    <h3>주간 업무보고 요약</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <div style={{ width: '100%', minHeight: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
                       {/* 블럭들을 순서대로 렌더링 */}
                       {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
                         switch(block.type) {
@@ -429,10 +428,118 @@ export default function IssuesPage() {
                                 <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28313b', marginBottom: 12 }}>
                                   {block.data.total_issues}건
                                 </div>
-                                <div style={{ display: 'flex', gap: 24, fontSize: '1rem', color: '#555' }}>
-                                  <span>진행 중 일감: <strong style={{ color: '#FF6B6B' }}>{block.data.in_progress_count}건</strong></span>
-                                  <span>완료된 일감: <strong style={{ color: '#4CAF50' }}>{block.data.completed_count}건</strong></span>
-                                  <span>완료율: <strong style={{ color: '#2196F3' }}>{block.data.completion_rate}%</strong></span>
+                                <div style={{ display: 'flex', gap: 24, fontSize: '1rem', color: '#555', marginBottom: 12 }}>
+                                  <span><strong>진행 중 일감:</strong> <strong style={{ color: '#FF6B6B' }}>{block.data.in_progress_count}건</strong></span>
+                                  <span><strong>완료된 일감:</strong> <strong style={{ color: '#4CAF50' }}>{block.data.completed_count}건</strong></span>
+                                  <span><strong>완료율:</strong> <strong style={{ color: '#2196F3' }}>{block.data.completion_rate}%</strong></span>
+                                </div>
+                                {block.data.tracker_text && (
+                                  <div style={{ fontSize: '1rem', color: '#555' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: 8 }}>유형별 일감</div>
+                                    <div dangerouslySetInnerHTML={{ __html: block.data.tracker_text }} />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          case 'problematic_products':
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>가장 문제가 많이 발생한 설비군 Top 3</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {block.data.map((product: any, productIndex: number) => (
+                                    <div key={productIndex} style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'center',
+                                      padding: '12px 16px',
+                                      background: '#fff',
+                                      borderRadius: 6,
+                                      border: '1px solid #e0e0e0'
+                                    }}>
+                                      <span style={{ fontWeight: 600, color: '#222' }}>
+                                        {product.product}
+                                      </span>
+                                      <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
+                                        <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{product.in_progress}건</strong></span>
+                                        <span>완료: <strong style={{ color: '#4CAF50' }}>{product.completed}건</strong></span>
+                                        <span>완료율: <strong style={{ color: '#2196F3' }}>{product.completion_rate}%</strong></span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          case 'problematic_sites':
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>Site 별 작업 현황</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {block.data.map((site: any, siteIndex: number) => (
+                                    <div key={siteIndex} style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'center',
+                                      padding: '12px 16px',
+                                      background: '#fff',
+                                      borderRadius: 6,
+                                      border: '1px solid #e0e0e0',
+                                      cursor: 'pointer',
+                                      position: 'relative'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (site.tooltip) {
+                                        const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                        if (tooltip) tooltip.style.display = 'block';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                      if (tooltip) tooltip.style.display = 'none';
+                                    }}
+                                    >
+                                      <span style={{ fontWeight: 600, color: '#222' }}>
+                                        {site.site}
+                                      </span>
+                                      <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
+                                        <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{site.in_progress}건</strong></span>
+                                        <span>완료: <strong style={{ color: '#4CAF50' }}>{site.completed}건</strong></span>
+                                        <span>완료율: <strong style={{ color: '#2196F3' }}>{site.completion_rate}%</strong></span>
+                                      </div>
+                                      
+                                      {/* 툴팁 */}
+                                      {site.tooltip && (
+                                        <div className="tooltip" style={{
+                                          position: 'fixed',
+                                          top: '150px',
+                                          right: 'calc(30vw)',
+                                          background: '#333',
+                                          color: '#fff',
+                                          padding: '16px 20px',
+                                          borderRadius: '8px',
+                                          fontSize: '0.9rem',
+                                          maxWidth: '1200px',
+                                          minWidth: '800px',
+                                          zIndex: 1000,
+                                          display: 'none',
+                                          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                                          border: '1px solid #555'
+                                        }}>
+                                          <div dangerouslySetInnerHTML={{ __html: site.tooltip }} />
+                                          <div style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            width: 0,
+                                            height: 0,
+                                            borderLeft: '8px solid transparent',
+                                            borderRight: '8px solid transparent',
+                                            borderTop: '8px solid #333'
+                                          }}></div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             );
