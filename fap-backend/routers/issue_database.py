@@ -609,6 +609,62 @@ async def get_sub_site(site_index: int = Query(..., description="SITE 버튼 인
         "projects": sub_site_list
     }
 
+@router.post("/sub-sites")
+async def get_sub_sites(request: Request): # 수정 불가
+    """다중 SITE 선택용 - SITE 인덱스 리스트로 Sub Site 목록 조회"""
+    try:
+        data = await request.json()
+        site_indexes = data.get('site_indexes', [])
+        
+        if not site_indexes:
+            return {
+                "success": True,
+                "projects": []
+            }
+        
+        # 모든 SITE의 Sub Site 데이터 수집
+        all_sub_sites = []
+        
+        for site_index in site_indexes:
+            try:
+                # 기존 get_sub_site 함수의 로직을 재사용
+                site_id = CUSTOMER_PROJECT_IDS[site_index]
+                
+                db = DatabaseManager()
+                project_info = db.get_projects_by_ids([site_id])
+                
+                if not project_info:
+                    continue
+                
+                children_ids = project_info[0].get('children_ids', [])
+                # JSON 문자열을 파싱해서 숫자 리스트로 변환
+                if isinstance(children_ids, str):
+                    children_ids = json.loads(children_ids)
+                sub_projects = db.get_projects_by_ids(children_ids)
+                
+                # 각 SITE의 Sub Site 목록 추가
+                for project in sub_projects:
+                    project_name = project.get('project_name', '')
+                    all_sub_sites.append({
+                        'project_name': project_name
+                    })
+                        
+            except Exception as e:
+                print(f"SITE {site_index} 처리 중 오류: {str(e)}")
+                continue
+        
+        # ALL을 제일 처음에 추가
+        final_sub_sites = [{'project_name': 'ALL'}]
+        final_sub_sites.extend(all_sub_sites)
+        
+        return {
+            "success": True,
+            "projects": final_sub_sites
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"다중 SITE Sub Site 조회 실패: {str(e)}")
+
 @router.get("/product-list")
 async def get_product_list(sub_project_name: str = Query(..., description="SUB 프로젝트 이름")): # 수정 불가
     """SUB 프로젝트 이름으로 레벨4 프로젝트 목록 조회"""
@@ -677,6 +733,98 @@ async def get_product_list(sub_project_name: str = Query(..., description="SUB �
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Product List 조회 실패: {str(e)}")
+
+@router.post("/product-lists")
+async def get_product_lists(request: Request): # 수정 불가가
+    """다중 Sub Site 선택용 - Sub Site 이름 리스트로 Product List 목록 조회"""
+    try:
+        data = await request.json()
+        sub_site_names = data.get('sub_site_names', [])
+        
+        if not sub_site_names:
+            return {
+                "success": True,
+                "product_list": []
+            }
+        
+        # 모든 Sub Site의 Product 데이터 수집
+        all_products = []
+        
+        for sub_site_name in sub_site_names:
+            try:
+                # 기존 get_product_list 함수의 로직을 재사용
+                db = DatabaseManager()
+                projects = db.get_projects_by_name(sub_site_name)
+                
+                if not projects:
+                    continue
+                
+                children_ids_str = projects[0].get('children_ids', '[]')
+                if isinstance(children_ids_str, str):
+                    children_ids = json.loads(children_ids_str)
+                
+                sub_projects = db.get_projects_by_ids(children_ids)
+                
+                # 레벨에 따라 처리
+                products = []
+                products_ids = []
+                for project in sub_projects:
+                    level = project.get('level', 0)
+                    
+                    if level == 4:
+                        products.append(project)
+                    elif level == 3:
+                        children_ids_str = project.get('children_ids', '[]')
+                        if isinstance(children_ids_str, str):
+                            sub_children_ids = json.loads(children_ids_str)
+                            products_ids.extend(sub_children_ids)
+                
+                # products_ids로 하위 프로젝트들의 모든 정보 조회
+                final_products = db.get_projects_by_ids(products_ids)
+                
+                # final_products에서 레벨 4인 프로젝트들만 products에 저장
+                for project in final_products:
+                    level = project.get('level', 0)
+                    if level == 4:
+                        products.append(project)
+                
+                # 각 Sub Site의 Product 목록 추가
+                import re
+                for project in products:
+                    project_name = project.get('project_name', '')
+                    # "#01", "#02" 등의 패턴 앞부분 추출
+                    match = re.match(r'^(.+?)\s+#\d+', project_name)
+                    if match:
+                        prefix = match.group(1).strip()
+                        all_products.append({
+                            'name': prefix
+                        })
+                        
+            except Exception as e:
+                print(f"Sub Site {sub_site_name} 처리 중 오류: {str(e)}")
+                continue
+        
+        # 중복 제거 (같은 이름의 Product가 여러 Sub Site에 있을 수 있음)
+        unique_products = []
+        seen_names = set()
+        
+        for product in all_products:
+            product_name = product.get('name', '')
+            if product_name not in seen_names:
+                seen_names.add(product_name)
+                unique_products.append(product)
+        
+        # ALL을 제일 처음에 추가
+        final_product_list = [{'name': 'ALL'}]
+        final_product_list.extend(unique_products)
+        
+        return {
+            "success": True,
+            "product_list": final_product_list
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"다중 Sub Site Product List 조회 실패: {str(e)}")
 
 @router.post("/get-all-product-list")
 async def get_all_product_list(request: Request):  # 수정 불가
@@ -762,46 +910,6 @@ async def get_all_product_list(request: Request):  # 수정 불가
         raise HTTPException(status_code=500, detail=f"전체 Product List 조회 실패: {str(e)}") 
 
 
-@router.post("/get-issue-status-data")
-async def get_issue_status_data(request: Request):
-    """이슈 현황 탭 클릭 시 호출되는 API"""
-    try:
-        data = await request.json()
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        site_index = data.get('site_index')
-        sub_site_name = data.get('sub_site_name')
-        product_name = data.get('product_name')
-        
-        if not all([start_date, end_date, site_index is not None, sub_site_name, product_name]):
-            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_index, sub_site_name, product_name")
-        
-        # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
-        project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
-        
-        # project_ids와 기간을 가지고 이슈 데이터 조회
-        db = DatabaseManager()
-        issues = db.get_issues_by_filter(start_date, end_date, project_ids)
-        
-        # tracker_name별로 카운트
-        tracker_counts = {}
-        for issue in issues:
-            tracker_name = issue.get('tracker_name', 'Unknown')
-            tracker_counts[tracker_name] = tracker_counts.get(tracker_name, 0) + 1
-        
-        # tracker별 카운트 리턴
-        return {
-            "success": True,
-            "data": {
-                "tracker_counts": tracker_counts
-            }
-        }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"이슈 현황 데이터 조회 실패: {str(e)}") 
-
 
 @router.post("/get-summary-report")
 async def get_summary_report(request: Request):
@@ -810,48 +918,100 @@ async def get_summary_report(request: Request):
         data = await request.json()
         start_date = data.get('start_date')
         end_date = data.get('end_date')
-        site_index = data.get('site_index')
-        sub_site_name = data.get('sub_site_name')
-        product_name = data.get('product_name')
+        site_indexes = data.get('site_indexes', [])  # 다중 SITE 지원
+        sub_site_names = data.get('sub_site_names', [])  # 다중 Sub Site 지원
+        product_names = data.get('product_names', [])  # 다중 Product 지원
         
-        if not all([start_date, end_date, site_index is not None, sub_site_name, product_name]):
-            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_index, sub_site_name, product_name")
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
         
-        # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
-        project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+        
+        # 선택된 리스트들 로그 출력
+        print(f"[get_summary_report] 선택된 SITE 인덱스: {site_indexes}")
+        print(f"[get_summary_report] 선택된 Sub Site 이름: {sub_site_names}")
+        print(f"[get_summary_report] 선택된 Product 이름: {product_names}")
+        print(f"[get_summary_report] 시작일: {start_date}, 종료일: {end_date}")
+        
+        # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
+        all_project_ids = []
+        
+        for site_index in site_indexes:
+            for sub_site_name in sub_site_names:
+                for product_name in product_names:
+                    # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
+                    project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+                    all_project_ids.extend(project_ids)
+        
+        # 중복 제거
+        all_project_ids = list(set(all_project_ids))
+        
+        print(f"[get_summary_report] 수집된 프로젝트 ID 개수: {len(all_project_ids)}")
+        print(f"[get_summary_report] 프로젝트 ID 목록: {all_project_ids}")
         
         # project_ids와 기간을 가지고 이슈 데이터 조회
         db = DatabaseManager()
-        issues = db.get_issues_by_filter(start_date, end_date, project_ids)
+        issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
         
         # 전체 이슈 현황 블럭 생성 (항상 포함)
         overall_status = get_overall_issue_status(issues)
         blocks = [{"type": "overall_status", "data": overall_status}]
         
         # 조건별 블럭 추가
-        if sub_site_name == "ALL":
-            if product_name == "ALL":
+        # if sub_site_name == "ALL":
+        #    if product_name == "ALL":
                 # Sub Site ALL + Product List ALL
                 # 가장 문제가 많은 Site Top 3 블럭 추가
-                problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
-                blocks.append(problematic_sites)
+                # problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
+                # blocks.append(problematic_sites)
                 # 가장 문제가 많은 Product Top 3 블럭 추가
-                problematic_products = get_most_problematic_products(issues)
-                blocks.append(problematic_products)
-            else:
+                # problematic_products = get_most_problematic_products(issues)
+                # blocks.append(problematic_products)
+        #        pass
+        #    else:
                 # Sub Site ALL + Product List 특정
                 # 가장 문제가 많은 Site Top 3 블럭 추가
-                problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
-                blocks.append(problematic_sites)
-        else:
-            if product_name == "ALL":
+                # problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
+                # blocks.append(problematic_sites)
+        #        pass
+        # else:
+        #     if product_name == "ALL":
                 # Sub Site 특정 + Product List ALL
                 # 가장 문제가 많은 Product Top 3 블럭 추가
-                problematic_products = get_most_problematic_products(issues)
-                blocks.append(problematic_products)
-            else:
+                # problematic_products = get_most_problematic_products(issues)
+                # blocks.append(problematic_products)
+        #        pass
+        #    else:
                 # Sub Site 특정 + Product List 특정
                 # 기능 1, 기능 5 추가
+        #        pass
+        
+        # 다중 선택 조건별 블럭 추가
+        # Sub Site가 "ALL"이거나 여러개가 선택된 경우
+        has_multiple_sub_sites = "ALL" in sub_site_names or len(sub_site_names) > 1
+        
+        # Product List가 "ALL"이거나 여러개가 선택된 경우
+        has_multiple_products = "ALL" in product_names or len(product_names) > 1
+        
+        if has_multiple_sub_sites:
+            if has_multiple_products:
+                # 조건 1: Sub Site ALL/다중 + Product ALL/다중
+                pass
+            else:
+                # 조건 2: Sub Site ALL/다중 + Product 한개
+                pass
+        else:
+            if has_multiple_products:
+                # 조건 3: Sub Site 한개 + Product ALL/다중
+                pass
+            else:
+                # 조건 4: Sub Site 한개 + Product 한개
                 pass
         
         return {
@@ -865,4 +1025,184 @@ async def get_summary_report(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"주간 업무보고 데이터 조회 실패: {str(e)}") 
+
+
+@router.post("/get-progress-data")
+async def get_progress_data(request: Request):
+    """진행율 데이터 조회 API"""
+    try:
+        data = await request.json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        site_indexes = data.get('site_indexes', [])
+        sub_site_names = data.get('sub_site_names', [])
+        product_names = data.get('product_names', [])
+
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
+
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+
+        # TODO: 진행율 데이터 로직 구현
+        pass
+
+        return {
+            "success": True,
+            "data": {}
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"진행율 데이터 조회 실패: {str(e)}")
+
+
+@router.post("/get-type-data")
+async def get_type_data(request: Request):
+    """유형 데이터 조회 API"""
+    try:
+        data = await request.json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        site_indexes = data.get('site_indexes', [])
+        sub_site_names = data.get('sub_site_names', [])
+        product_names = data.get('product_names', [])
+
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
+
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+
+        # TODO: 유형 데이터 로직 구현
+        pass
+
+        return {
+            "success": True,
+            "data": {}
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"유형 데이터 조회 실패: {str(e)}")
+
+
+@router.post("/get-member-data")
+async def get_member_data(request: Request):
+    """인원 데이터 조회 API"""
+    try:
+        data = await request.json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        site_indexes = data.get('site_indexes', [])
+        sub_site_names = data.get('sub_site_names', [])
+        product_names = data.get('product_names', [])
+
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
+
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+
+        # TODO: 인원 데이터 로직 구현
+        pass
+
+        return {
+            "success": True,
+            "data": {}
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"인원 데이터 조회 실패: {str(e)}")
+
+
+@router.post("/get-hw-data")
+async def get_hw_data(request: Request):
+    """HW 데이터 조회 API"""
+    try:
+        data = await request.json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        site_indexes = data.get('site_indexes', [])
+        sub_site_names = data.get('sub_site_names', [])
+        product_names = data.get('product_names', [])
+
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
+
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+
+        # TODO: HW 데이터 로직 구현
+        pass
+
+        return {
+            "success": True,
+            "data": {}
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"HW 데이터 조회 실패: {str(e)}")
+
+
+@router.post("/get-sw-data")
+async def get_sw_data(request: Request):
+    """SW 데이터 조회 API"""
+    try:
+        data = await request.json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        site_indexes = data.get('site_indexes', [])
+        sub_site_names = data.get('sub_site_names', [])
+        product_names = data.get('product_names', [])
+
+        # 기존 단일 선택 호환성을 위한 처리
+        if not site_indexes and data.get('site_index') is not None:
+            site_indexes = [data.get('site_index')]
+        if not sub_site_names and data.get('sub_site_name'):
+            sub_site_names = [data.get('sub_site_name')]
+        if not product_names and data.get('product_name'):
+            product_names = [data.get('product_name')]
+
+        if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+
+        # TODO: SW 데이터 로직 구현
+        pass
+
+        return {
+            "success": True,
+            "data": {}
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SW 데이터 조회 실패: {str(e)}")
 

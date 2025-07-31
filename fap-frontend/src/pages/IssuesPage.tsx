@@ -4,9 +4,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const VIEW_TABS = [
   { key: 'summary', label: 'summary' },
-  { key: 'progress', label: '일감 요약' },
-  { key: 'work', label: '업무 분석' },
-  { key: 'member', label: '인원 분석' },
+  { key: 'progress', label: 'progress' },
+  { key: 'type', label: 'type' },
+  { key: 'member', label: 'member' },
+  { key: 'hw', label: 'HW' },
+  { key: 'sw', label: 'SW' },
 ];
 
 // 고객사 프로젝트 타입 정의
@@ -34,12 +36,12 @@ export default function IssuesPage() {
   const [dateTo, setDateTo] = useState(getToday());
   const [activeView, setActiveView] = useState('summary');
   const [customerProjects, setCustomerProjects] = useState<CustomerProject[]>([]);
-  const [selectedSite, setSelectedSite] = useState<string>('');
-  const [selectedSiteIndex, setSelectedSiteIndex] = useState<number>(-1);
+  const [selectedSites, setSelectedSites] = useState<string[]>([]);
+  const [selectedSiteIndexes, setSelectedSiteIndexes] = useState<number[]>([]);
   const [subProjects, setSubProjects] = useState<CustomerProject[]>([]);
-  const [selectedSubSite, setSelectedSubSite] = useState<string>('');
+  const [selectedSubSites, setSelectedSubSites] = useState<string[]>([]);
   const [productList, setProductList] = useState<ProductItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [issueData, setIssueData] = useState<any>(null);
 
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
@@ -60,112 +62,268 @@ export default function IssuesPage() {
     }
   };
 
-  // SITE 버튼 클릭 핸들러
-  const handleSiteClick = async (siteName: string, siteIndex: number) => {
-    setSelectedSite(siteName);
-    setSelectedSiteIndex(siteIndex);
-    setSelectedSubSite('');
-    setProductList([]);
-    setSelectedProduct('');
-    setIssueData(null);
+  // SITE 버튼 클릭 핸들러 (다중 선택 지원)
+  const handleSiteClick = async (siteName: string, siteIndex: number, event: React.MouseEvent) => { // 수정 불가
+    const isCtrlPressed = event.ctrlKey || event.metaKey;
     
-    try {
-      const response = await fetch(`/api/issues/sub-site?site_index=${siteIndex}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSubProjects(data.projects || []);
-      }
-    } catch (error) {
-      console.error('Sub Site 조회 오류:', error);
-      setSubProjects([]);
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 다중 선택
+      setSelectedSites(prev => {
+        if (prev.includes(siteName)) {
+          return prev.filter(name => name !== siteName);
+        } else {
+          return [...prev, siteName];
+        }
+      });
+      setSelectedSiteIndexes(prev => {
+        if (prev.includes(siteIndex)) {
+          return prev.filter(index => index !== siteIndex);
+        } else {
+          return [...prev, siteIndex];
+        }
+      });
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      setSelectedSites([siteName]);
+      setSelectedSiteIndexes([siteIndex]);
     }
-  };
-
-  // Sub Site 버튼 클릭 핸들러
-  const handleSubSiteClick = async (subSiteName: string) => {
-    setSelectedSubSite(subSiteName);
+    
+    setSelectedSubSites([]);
     setProductList([]);
-    setSelectedProduct('');
+    setSelectedProducts([]);
     setIssueData(null);
     
-    if (subSiteName === 'ALL') {
-      // ALL 선택 시 모든 Sub Site List를 백엔드로 전송
+    // 현재 선택된 Site들 확인
+    let currentSelectedSites: string[] = [];
+    let currentSelectedSiteIndexes: number[] = [];
+    
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 현재 상태에서 변경된 상태 계산
+      const wasSelected = selectedSites.includes(siteName);
+      if (wasSelected) {
+        currentSelectedSites = selectedSites.filter(name => name !== siteName);
+        currentSelectedSiteIndexes = selectedSiteIndexes.filter(index => index !== siteIndex);
+      } else {
+        currentSelectedSites = [...selectedSites, siteName];
+        currentSelectedSiteIndexes = [...selectedSiteIndexes, siteIndex];
+      }
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      currentSelectedSites = [siteName];
+      currentSelectedSiteIndexes = [siteIndex];
+    }
+    
+    // 선택된 Site가 없으면 Sub Site 초기화
+    if (currentSelectedSites.length === 0) {
+      setSubProjects([]);
+    } else if (currentSelectedSiteIndexes.length === 1) {
+      // 단일 선택인 경우 기존 API 사용
       try {
-        const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
-        const response = await fetch('/api/issues/get-all-product-list', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sub_site_list: subSiteNames })
-        });
+        const response = await fetch(`/api/issues/sub-site?site_index=${currentSelectedSiteIndexes[0]}`);
         if (response.ok) {
           const data = await response.json();
-          if (data.success) {
-            setProductList(data.product_list || []);
+          if (data.projects) {
+            setSubProjects(data.projects);
           }
         }
       } catch (error) {
-        console.error('전체 Product List 조회 오류:', error);
-        setProductList([]);
+        console.error(`Sub Site 조회 오류 (site_index: ${currentSelectedSiteIndexes[0]}):`, error);
       }
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/issues/product-list?sub_project_name=${subSiteName}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setProductList(data.product_list || []);
+    } else {
+      // 다중 선택인 경우 새로운 API 사용
+      try {
+        const response = await fetch('/api/issues/sub-sites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            site_indexes: currentSelectedSiteIndexes
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.projects) {
+            setSubProjects(data.projects);
+          }
         }
+      } catch (error) {
+        console.error('다중 SITE Sub Site 조회 오류:', error);
       }
-    } catch (error) {
-      console.error('Product List 조회 오류:', error);
-      setProductList([]);
     }
   };
 
-  // Product List 선택 핸들러
-  const handleProductClick = async (productName: string) => {
-    setSelectedProduct(productName);
+  // Sub Site 버튼 클릭 핸들러 (다중 선택 지원)
+  const handleSubSiteClick = async (subSiteName: string, event: React.MouseEvent) => { // 수정 불가
+    const isCtrlPressed = event.ctrlKey || event.metaKey;
+    
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 다중 선택
+      setSelectedSubSites(prev => {
+        if (prev.includes(subSiteName)) {
+          return prev.filter(name => name !== subSiteName);
+        } else {
+          return [...prev, subSiteName];
+        }
+      });
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      setSelectedSubSites([subSiteName]);
+    }
+    
+    setProductList([]);
+    setSelectedProducts([]);
+    setIssueData(null);
+    
+    // 현재 선택된 Sub Site들 확인
+    let currentSelectedSubSites: string[] = [];
+    
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 현재 상태에서 변경된 상태 계산
+      const wasSelected = selectedSubSites.includes(subSiteName);
+      if (wasSelected) {
+        currentSelectedSubSites = selectedSubSites.filter(name => name !== subSiteName);
+      } else {
+        currentSelectedSubSites = [...selectedSubSites, subSiteName];
+      }
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      currentSelectedSubSites = [subSiteName];
+    }
+    
+    // 선택된 Sub Site가 없으면 Product List 초기화
+    if (currentSelectedSubSites.length === 0) {
+      setProductList([]);
+    } else if (currentSelectedSubSites.length === 1) {
+      // 단일 선택인 경우 기존 로직 사용
+      if (currentSelectedSubSites[0] === 'ALL') {
+        // ALL 선택 시 모든 Sub Site List를 백엔드로 전송
+        try {
+          const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
+          const response = await fetch('/api/issues/get-all-product-list', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sub_site_list: subSiteNames })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setProductList(data.product_list || []);
+            }
+          }
+        } catch (error) {
+          console.error('전체 Product List 조회 오류:', error);
+          setProductList([]);
+        }
+      } else {
+        // 특정 Sub Site 선택
+        try {
+          const response = await fetch(`/api/issues/product-list?sub_project_name=${currentSelectedSubSites[0]}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setProductList(data.product_list || []);
+            }
+          }
+        } catch (error) {
+          console.error('Product List 조회 오류:', error);
+          setProductList([]);
+        }
+      }
+    } else {
+      // 다중 선택인 경우
+      if (currentSelectedSubSites.includes('ALL')) {
+        // ALL이 포함된 다중 선택: 기존처럼 모든 Sub Site의 Product List 출력
+        try {
+          const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
+          const response = await fetch('/api/issues/get-all-product-list', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sub_site_list: subSiteNames })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setProductList(data.product_list || []);
+            }
+          }
+        } catch (error) {
+          console.error('전체 Product List 조회 오류:', error);
+          setProductList([]);
+        }
+      } else {
+        // ALL이 포함되지 않은 다중 선택: 선택된 Sub Site들의 Product List 합치기
+        try {
+          const response = await fetch('/api/issues/product-lists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              sub_site_names: currentSelectedSubSites 
+            })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setProductList(data.product_list || []);
+            }
+          }
+        } catch (error) {
+          console.error('다중 Sub Site Product List 조회 오류:', error);
+          setProductList([]);
+        }
+      }
+    }
+  };
+
+  // Product List 선택 핸들러 (다중 선택 지원)
+  const handleProductClick = async (productName: string, event: React.MouseEvent) => { // 수정 불가가
+    const isCtrlPressed = event.ctrlKey || event.metaKey;
+    
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 다중 선택
+      setSelectedProducts(prev => {
+        if (prev.includes(productName)) {
+          return prev.filter(name => name !== productName);
+        } else {
+          return [...prev, productName];
+        }
+      });
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      setSelectedProducts([productName]);
+    }
+    
     setIssueData(null); // 새 데이터 로드 전에 초기화
     
-    // 현재 활성 탭에 따라 데이터 로드
-    if (activeView === 'progress') {
-      await loadIssueStatusData(productName);
-    } else if (activeView === 'summary') {
-      await loadSummaryReportData(productName);
-    }
-    // 다른 탭들도 나중에 추가
-  };
-
-  // 이슈 현황 데이터 로드
-  const loadIssueStatusData = async (productName: string) => {
-    try {
-      const response = await fetch('/api/issues/get-issue-status-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          start_date: dateFrom,
-          end_date: dateTo,
-          site_index: selectedSiteIndex,
-          sub_site_name: selectedSubSite,
-          product_name: productName
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setIssueData(data.data);
-        }
+    // 현재 선택된 Product들 확인
+    let currentSelectedProducts: string[] = [];
+    
+    if (isCtrlPressed) {
+      // Ctrl 키가 눌린 경우: 현재 상태에서 변경된 상태 계산
+      const wasSelected = selectedProducts.includes(productName);
+      if (wasSelected) {
+        currentSelectedProducts = selectedProducts.filter(name => name !== productName);
+      } else {
+        currentSelectedProducts = [...selectedProducts, productName];
       }
-    } catch (error) {
-      console.error('이슈 현황 데이터 로드 오류:', error);
+    } else {
+      // Ctrl 키가 안 눌린 경우: 단일 선택
+      currentSelectedProducts = [productName];
+    }
+    
+    // Product가 선택되어 있으면 현재 활성 탭에 따라 데이터 로드
+    if (currentSelectedProducts.length > 0) {
+      if (activeView === 'progress') {
+        await loadProgressData(currentSelectedProducts);
+      } else if (activeView === 'summary') {
+        await loadSummaryReportData(currentSelectedProducts);
+      }
     }
   };
 
   // 주간 업무보고 데이터 로드
-  const loadSummaryReportData = async (productName: string) => {
+  const loadSummaryReportData = async (productNames: string[]) => {
     try {
       const response = await fetch('/api/issues/get-summary-report', {
         method: 'POST',
@@ -173,9 +331,9 @@ export default function IssuesPage() {
         body: JSON.stringify({
           start_date: dateFrom,
           end_date: dateTo,
-          site_index: selectedSiteIndex,
-          sub_site_name: selectedSubSite,
-          product_name: productName
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
         })
       });
       
@@ -187,6 +345,136 @@ export default function IssuesPage() {
       }
     } catch (error) {
       console.error('주간 업무보고 데이터 로드 오류:', error);
+    }
+  };
+
+  // 진행율 데이터 로드
+  const loadProgressData = async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/issues/get-progress-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('진행율 데이터 로드 오류:', error);
+    }
+  };
+
+  // 유형 데이터 로드
+  const loadTypeData = async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/issues/get-type-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('유형 데이터 로드 오류:', error);
+    }
+  };
+
+  // 인원 데이터 로드
+  const loadMemberData = async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/issues/get-member-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('인원 데이터 로드 오류:', error);
+    }
+  };
+
+  // HW 데이터 로드
+  const loadHWData = async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/issues/get-hw-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('HW 데이터 로드 오류:', error);
+    }
+  };
+
+  // SW 데이터 로드
+  const loadSWData = async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/issues/get-sw-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateFrom,
+          end_date: dateTo,
+          site_indexes: selectedSiteIndexes,
+          sub_site_names: selectedSubSites,
+          product_names: productNames
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIssueData(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('SW 데이터 로드 오류:', error);
     }
   };
 
@@ -221,7 +509,7 @@ export default function IssuesPage() {
                     return (
                       <button
                         key={customer.project_name}
-                        onClick={() => handleSiteClick(customer.project_name, index)}
+                        onClick={(e) => handleSiteClick(customer.project_name, index, e)}
                         style={{
                           width: '100%',
                           height: '48px',
@@ -229,8 +517,8 @@ export default function IssuesPage() {
                           fontSize: '1.08rem',
                           padding: '0 16px',
                           borderRadius: 6,
-                          background: selectedSite === customer.project_name ? '#28313b' : '#e5e8ef',
-                          color: selectedSite === customer.project_name ? '#fff' : '#222',
+                          background: selectedSites.includes(customer.project_name) ? '#28313b' : '#e5e8ef',
+                          color: selectedSites.includes(customer.project_name) ? '#fff' : '#222',
                           border: 'none',
                           cursor: 'pointer',
                           boxShadow: 'none',
@@ -264,7 +552,7 @@ export default function IssuesPage() {
                       return (
                         <button
                           key={subProject.project_name}
-                          onClick={() => handleSubSiteClick(subProject.project_name)}
+                          onClick={(e) => handleSubSiteClick(subProject.project_name, e)}
                           style={{
                             width: '100%',
                             height: '48px',
@@ -272,8 +560,8 @@ export default function IssuesPage() {
                             fontSize: '1.08rem',
                             padding: '0 16px',
                             borderRadius: 6,
-                            background: selectedSubSite === subProject.project_name ? '#28313b' : '#e5e8ef',
-                            color: selectedSubSite === subProject.project_name ? '#fff' : '#222',
+                            background: selectedSubSites.includes(subProject.project_name) ? '#28313b' : '#e5e8ef',
+                            color: selectedSubSites.includes(subProject.project_name) ? '#fff' : '#222',
                             border: 'none',
                             cursor: 'pointer',
                             boxShadow: 'none',
@@ -312,7 +600,7 @@ export default function IssuesPage() {
                       return (
                         <button
                           key={product.name}
-                          onClick={() => handleProductClick(product.name)}
+                          onClick={(e) => handleProductClick(product.name, e)}
                           style={{
                             width: '100%',
                             height: '48px',
@@ -320,8 +608,8 @@ export default function IssuesPage() {
                             fontSize: '1.08rem',
                             padding: '0 16px',
                             borderRadius: 6,
-                            background: selectedProduct === product.name ? '#28313b' : '#e5e8ef',
-                            color: selectedProduct === product.name ? '#fff' : '#222',
+                            background: selectedProducts.includes(product.name) ? '#28313b' : '#e5e8ef',
+                            color: selectedProducts.includes(product.name) ? '#fff' : '#222',
                             border: 'none',
                             cursor: 'pointer',
                             boxShadow: 'none',
@@ -362,12 +650,28 @@ export default function IssuesPage() {
                 onClick={async () => {
                   setActiveView(tab.key);
                   // 탭 변경 시 Product가 선택되어 있으면 데이터 로드
-                  if (selectedProduct && tab.key === 'progress') {
+                  if (selectedProducts.length > 0) {
                     setIssueData(null); // 데이터 초기화
-                    await loadIssueStatusData(selectedProduct);
-                  } else if (selectedProduct && tab.key === 'summary') {
-                    setIssueData(null); // 데이터 초기화
-                    await loadSummaryReportData(selectedProduct);
+                    switch (tab.key) {
+                      case 'progress':
+                        await loadProgressData(selectedProducts);
+                        break;
+                      case 'summary':
+                        await loadSummaryReportData(selectedProducts);
+                        break;
+                      case 'type':
+                        await loadTypeData(selectedProducts);
+                        break;
+                      case 'member':
+                        await loadMemberData(selectedProducts);
+                        break;
+                      case 'hw':
+                        await loadHWData(selectedProducts);
+                        break;
+                      case 'sw':
+                        await loadSWData(selectedProducts);
+                        break;
+                    }
                   }
                 }}
                 style={{
@@ -390,31 +694,10 @@ export default function IssuesPage() {
           {/* 선택된 뷰에 따른 내용 표시 */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', color: '#888', fontSize: '1.1rem', overflowY: 'auto' }}>
             {activeView === 'progress' && (
-              selectedProduct ? (
-                issueData ? (
-                  <div style={{ width: '100%', height: '100%' }}>
-                    <h3>이슈 현황 - Tracker별 분포</h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={Object.entries(issueData.tracker_counts).map(([name, count]) => ({ name, count }))}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          interval={0}
-                        />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#28313b" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : '데이터 로딩 중...'
-              ) : '검색 조건을 설정해주세요'
+              selectedProducts.length > 0 ? '진행율 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
             )}
             {activeView === 'summary' && (
-              selectedProduct ? (
+              selectedProducts.length > 0 ? (
                 issueData ? (
                   <div style={{ width: '100%', minHeight: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
@@ -552,11 +835,17 @@ export default function IssuesPage() {
                 ) : '데이터 로딩 중...'
               ) : '검색 조건을 설정해주세요'
             )}
-            {activeView === 'work' && (
-              selectedProduct ? '업무 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+            {activeView === 'type' && (
+              selectedProducts.length > 0 ? '유형 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
             )}
             {activeView === 'member' && (
-              selectedProduct ? '인원 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+              selectedProducts.length > 0 ? '인원 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+            )}
+            {activeView === 'hw' && (
+              selectedProducts.length > 0 ? 'HW 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+            )}
+            {activeView === 'sw' && (
+              selectedProducts.length > 0 ? 'SW 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
             )}
           </div>
         </div>
