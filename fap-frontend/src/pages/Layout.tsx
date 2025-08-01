@@ -24,7 +24,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     setUserId(id);
     const name = localStorage.getItem('fap_user_name') || '';
     setUserName(name);
-    console.log('Layout.tsx - localStorage userName:', name);
     const roles = localStorage.getItem('fap_user_roles');
     if (roles) {
       setUserRoles(JSON.parse(roles));

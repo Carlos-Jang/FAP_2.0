@@ -1,6 +1,6 @@
 import Layout from './Layout';
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const VIEW_TABS = [
   { key: 'summary', label: 'summary' },
@@ -43,6 +43,9 @@ export default function IssuesPage() {
   const [productList, setProductList] = useState<ProductItem[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [issueData, setIssueData] = useState<any>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
+  const [memberSortBy, setMemberSortBy] = useState<'total' | 'completion'>('total');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
 
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
   const fetchCustomerProjects = async () => {
@@ -51,11 +54,6 @@ export default function IssuesPage() {
       if (response.ok) {
         const data = await response.json();
         setCustomerProjects(data.projects || []);
-        // 첫 번째 고객사 자동 선택 해제
-        // if (data.projects && data.projects.length > 0) {
-        //   const firstCustomer = data.projects[0];
-        //   setSelectedSite(firstCustomer.project_name);
-        // }
       }
     } catch (error) {
       console.error('고객사 프로젝트 조회 오류:', error);
@@ -318,6 +316,14 @@ export default function IssuesPage() {
         await loadProgressData(currentSelectedProducts);
       } else if (activeView === 'summary') {
         await loadSummaryReportData(currentSelectedProducts);
+      } else if (activeView === 'member') {
+        await loadMemberData(currentSelectedProducts);
+      } else if (activeView === 'type') {
+        await loadTypeData(currentSelectedProducts);
+      } else if (activeView === 'hw') {
+        await loadHWData(currentSelectedProducts);
+      } else if (activeView === 'sw') {
+        await loadSWData(currentSelectedProducts);
       }
     }
   };
@@ -476,6 +482,17 @@ export default function IssuesPage() {
     } catch (error) {
       console.error('SW 데이터 로드 오류:', error);
     }
+  };
+
+  // 멤버 데이터 정렬 함수
+  const sortMemberData = (data: any[], sortBy: 'total' | 'completion') => {
+    const sortedData = [...data];
+    if (sortBy === 'total') {
+      sortedData.sort((a, b) => b.total_tasks - a.total_tasks);
+    } else {
+      sortedData.sort((a, b) => b.completion_rate - a.completion_rate);
+    }
+    return sortedData;
   };
 
   // 페이지 로드 시 고객사 목록 가져오기
@@ -836,10 +853,554 @@ export default function IssuesPage() {
               ) : '검색 조건을 설정해주세요'
             )}
             {activeView === 'type' && (
-              selectedProducts.length > 0 ? '유형 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+              selectedProducts.length > 0 ? (
+                issueData ? (
+                  <div style={{ width: '100%', minHeight: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                      {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
+                        switch (block.type) {
+                          case 'type_data':
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 16, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 12px 0', color: '#222', fontSize: '1.2rem' }}>유형별 통계</h4>
+                                <div style={{ 
+                                  padding: '12px 20px',
+                                  background: '#fff',
+                                  borderRadius: 8,
+                                  border: '1px solid #e0e0e0'
+                                }}>
+                                  {block.data.tracker_counts && Object.keys(block.data.tracker_counts).length > 0 ? (
+                                    (() => {
+                                      const trackerEntries = Object.entries(block.data.tracker_counts);
+                                      const totalCount = trackerEntries.reduce((sum, [_, count]) => sum + (count as number), 0);
+                                      
+                                      // 파이 차트용 데이터 생성
+                                      const pieData = trackerEntries.map(([trackerName, count]) => ({
+                                        name: trackerName,
+                                        value: count as number,
+                                        percentage: Math.round(((count as number) / totalCount) * 100)
+                                      }));
+                                      
+                                      // 차트 색상 배열 (4개 그룹으로 구성)
+                                      const COLORS = [
+                                        // 첫 번째 그룹: 블루 계열 색상 (6개)
+                                        '#28313b', '#8B0000', '#B8860B', '#006400', '#4B0082', '#000000',
+                                        // 두 번째 그룹: 빨강 계열 색상 (6개)
+                                        '#8B0000', '#A52A2A', '#B22222', '#CD5C5C', '#DC143C', '#FF0000',
+                                        // 세 번째 그룹: 초록 계열 색상 (6개)
+                                        '#006400', '#228B22', '#32CD32', '#90EE90', '#98FB98', '#00FF00',
+                                        // 네 번째 그룹: 노랑 계열 색상 (6개)
+                                        '#B8860B', '#DAA520', '#FFD700', '#FFFF00', '#F0E68C', '#F5DEB3'
+                                      ];
+                                      
+                                      return (
+                                        <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
+                                          {/* 파이 차트 */}
+                                          <div style={{ flex: 1, minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <ResponsiveContainer width="100%" height={300}>
+                                              <PieChart>
+                                                <Pie
+                                                  data={pieData}
+                                                  cx="50%"
+                                                  cy="50%"
+                                                  labelLine={false}
+                                                  label={({ percentage }) => `${percentage}%`}
+                                                  outerRadius={120}
+                                                  fill="#8884d8"
+                                                  dataKey="value"
+                                                >
+                                                  {pieData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                  ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value, name) => [`${value}건`, name]} />
+                                              </PieChart>
+                                            </ResponsiveContainer>
+                                          </div>
+                                          
+                                          {/* 상세 리스트 */}
+                                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                              {trackerEntries.map(([trackerName, count], index) => (
+                                                <div 
+                                                  key={trackerName}
+                                                  style={{
+                                                    background: selectedType === trackerName ? '#1565C0' : COLORS[index % COLORS.length],
+                                                    color: '#fff',
+                                                    padding: '12px 16px',
+                                                    borderRadius: 6,
+                                                    fontWeight: 600,
+                                                    fontSize: '0.9rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'background-color 0.2s ease',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                  }}
+                                                  onClick={() => setSelectedType(selectedType === trackerName ? null : trackerName)}
+                                                >
+                                                  <span>{trackerName}</span>
+                                                  <span>{count as number}건</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()
+                                  ) : (
+                                    <div style={{ textAlign: 'center', color: '#666' }}>
+                                      해당 기간에는 작업 이력이 없습니다.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          case 'type_data_list':
+                            // 선택된 유형이 없으면 List를 숨김
+                            if (!selectedType) {
+                              return null;
+                            }
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>
+                                  유형별 상세 현황 - {selectedType}
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {block.data.type_list && block.data.type_list.length > 0 ? (
+                                    (() => {
+                                      const filteredTypeList = block.data.type_list.filter((typeItem: any) => typeItem.tracker_name === selectedType);
+                                      
+                                      if (filteredTypeList.length === 0) {
+                                        return (
+                                          <div style={{ 
+                                            textAlign: 'center', 
+                                            padding: '40px 20px', 
+                                            color: '#666',
+                                            background: '#fff',
+                                            borderRadius: 8,
+                                            border: '1px solid #e0e0e0'
+                                          }}>
+                                            {selectedType}의 상세 데이터가 없습니다.
+                                          </div>
+                                        );
+                                      }
+                                      
+                                                                             return filteredTypeList.map((typeItem: any, typeIndex: number) => (
+                                         <div key={typeIndex} style={{ 
+                                           display: 'flex', 
+                                           justifyContent: 'space-between', 
+                                           alignItems: 'flex-start',
+                                           padding: '16px 20px',
+                                           background: '#fff',
+                                           borderRadius: 8,
+                                           border: '1px solid #e0e0e0',
+                                           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                         }}>
+                                           {/* 유형 이름 */}
+                                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                                             <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
+                                               {typeItem.tracker_name}
+                                             </span>
+                                             
+                                             {/* Product 상세 정보 */}
+                                             {typeItem.product_details && typeItem.product_details.length > 0 && (
+                                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                 <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 600 }}>설비군별 현황:</span>
+                                                 {typeItem.product_details.map((product: any, productIndex: number) => (
+                                                   <div key={productIndex} style={{ 
+                                                     padding: '8px 12px',
+                                                     background: '#f8f9fa',
+                                                     borderRadius: 6,
+                                                     border: '1px solid #e9ecef',
+                                                     marginLeft: 8
+                                                   }}>
+                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                       <span style={{ 
+                                                         fontSize: '0.85rem', 
+                                                         color: '#495057',
+                                                         fontWeight: 600
+                                                       }}>
+                                                         {product.product_name}
+                                                       </span>
+                                                       <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                                                         완료율: {product.completion_rate}%
+                                                       </span>
+                                                     </div>
+                                                     <div style={{ display: 'flex', gap: 12, fontSize: '0.75rem', color: '#6c757d' }}>
+                                                       <span>전체: {product.total_count}건</span>
+                                                       <span>진행중: {product.in_progress_count}건</span>
+                                                       <span>완료: {product.completed_count}건</span>
+                                                     </div>
+                                                   </div>
+                                                 ))}
+                                               </div>
+                                             )}
+                                           </div>
+                                           
+                                           {/* 통계 정보 */}
+                                           <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555', alignItems: 'center' }}>
+                                             <span>전체: <strong style={{ color: '#28313b' }}>{typeItem.total_count}건</strong></span>
+                                             <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{typeItem.in_progress_count}건</strong></span>
+                                             <span>완료: <strong style={{ color: '#4CAF50' }}>{typeItem.completed_count}건</strong></span>
+                                             <span>완료율: <strong style={{ color: '#2196F3' }}>{typeItem.completion_rate}%</strong></span>
+                                           </div>
+                                         </div>
+                                       ));
+                                     })()
+                                  ) : (
+                                    <div style={{ 
+                                      textAlign: 'center', 
+                                      padding: '40px 20px', 
+                                      color: '#666',
+                                      background: '#fff',
+                                      borderRadius: 8,
+                                      border: '1px solid #e0e0e0'
+                                    }}>
+                                      해당 기간에 유형별 상세 데이터가 없습니다.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </div>
+                  </div>
+                ) : '데이터 로딩 중...'
+              ) : '검색 조건을 설정해주세요'
             )}
             {activeView === 'member' && (
-              selectedProducts.length > 0 ? '인원 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+              selectedProducts.length > 0 ? (
+                issueData ? (
+                  <div style={{ width: '100%', minHeight: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                      {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
+                        switch (block.type) {
+                          case 'best_member_summary':
+                            return (
+                                                      <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                          <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>BEST 작업자</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {block.data && block.data.length > 0 ? (
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      flexWrap: 'wrap', 
+                                      gap: 12,
+                                      padding: '16px 20px',
+                                      background: '#fff',
+                                      borderRadius: 8,
+                                      border: '1px solid #e0e0e0'
+                                    }}>
+                                      {block.data.map((summary: any, summaryIndex: number) => (
+                                        <div 
+                                          key={summaryIndex} 
+                                          style={{
+                                            background: selectedAuthor === summary.author ? '#1565C0' : '#28313b',
+                                            color: '#fff',
+                                            padding: '8px 16px',
+                                            borderRadius: 6,
+                                            fontWeight: 600,
+                                            fontSize: '0.9rem',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s ease'
+                                          }}
+                                          onClick={() => setSelectedAuthor(selectedAuthor === summary.author ? null : summary.author)}
+                                        >
+                                          {summary.author} {summary.count}건
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ 
+                                      textAlign: 'center', 
+                                      padding: '40px 20px', 
+                                      color: '#666',
+                                      background: '#fff',
+                                      borderRadius: 8,
+                                      border: '1px solid #e0e0e0'
+                                    }}>
+                                      해당 기간에 [AE]BEST 작업이 없습니다.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          case 'best_member_data':
+                            // BEST 작업자가 선택되지 않았으면 List를 숨김
+                            if (!selectedAuthor) {
+                              return null;
+                            }
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>
+                                  BEST 작업 List - {selectedAuthor}
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {(() => {
+                                    const filteredData = block.data.filter((member: any) => member.author === selectedAuthor);
+                                    
+                                    if (filteredData && filteredData.length > 0) {
+                                      return filteredData.map((member: any, memberIndex: number) => (
+                                        <div key={memberIndex} style={{ 
+                                          display: 'flex', 
+                                          justifyContent: 'space-between', 
+                                          alignItems: 'center',
+                                          padding: '16px 20px',
+                                          background: '#fff',
+                                          borderRadius: 8,
+                                          border: '1px solid #e0e0e0',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                                                          <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
+                                              {member.author}
+                                            </span>
+                                              <span style={{ color: '#666', fontSize: '0.9rem' }}>
+                                                {member.product}
+                                              </span>
+                                            </div>
+                                            <div style={{ color: '#333', fontSize: '0.95rem', marginTop: 4 }}>
+                                              {member.subject}
+                                            </div>
+                                          </div>
+                                          <div 
+                                            style={{ 
+                                              background: '#28313b', 
+                                              color: '#fff', 
+                                              padding: '8px 12px', 
+                                              borderRadius: 6,
+                                              fontWeight: 600,
+                                              fontSize: '0.9rem',
+                                              cursor: 'pointer',
+                                              transition: 'background-color 0.2s ease'
+                                            }}
+                                            onClick={() => {
+                                              // Redmine URL 구성
+                                              const redmineUrl = `https://pms.ati2000.co.kr/issues/${member.issue_id}`;
+                                              window.open(redmineUrl, '_blank');
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.background = '#1565C0';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.background = '#28313b';
+                                            }}
+                                          >
+                                            #{member.issue_id}
+                                          </div>
+                                        </div>
+                                      ));
+                                    } else {
+                                      return (
+                                        <div style={{ 
+                                          textAlign: 'center', 
+                                          padding: '40px 20px', 
+                                          color: '#666',
+                                          background: '#fff',
+                                          borderRadius: 8,
+                                          border: '1px solid #e0e0e0'
+                                        }}>
+                                          {selectedAuthor}의 BEST 작업이 없습니다.
+                                        </div>
+                                      );
+                                    }
+                                  })()}
+                                </div>
+                              </div>
+                            );
+                          case 'member_issue_type':
+                            return (
+                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                  <h4 style={{ margin: 0, color: '#222', fontSize: '1.2rem' }}>작업자별 이슈 유형</h4>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button
+                                      onClick={() => setMemberSortBy('total')}
+                                      style={{
+                                        padding: '6px 12px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 600,
+                                        borderRadius: 6,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: memberSortBy === 'total' ? '#28313b' : '#e5e8ef',
+                                        color: memberSortBy === 'total' ? '#fff' : '#222',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      작업 개수
+                                    </button>
+                                    <button
+                                      onClick={() => setMemberSortBy('completion')}
+                                      style={{
+                                        padding: '6px 12px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 600,
+                                        borderRadius: 6,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: memberSortBy === 'completion' ? '#28313b' : '#e5e8ef',
+                                        color: memberSortBy === 'completion' ? '#fff' : '#222',
+                                        transition: 'all 0.15s'
+                                      }}
+                                    >
+                                      완료율
+                                    </button>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  {block.data && block.data.length > 0 ? (
+                                    sortMemberData(block.data, memberSortBy).map((member: any, memberIndex: number) => (
+                                      <div key={memberIndex} style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        padding: '16px 20px',
+                                        background: '#fff',
+                                        borderRadius: 8,
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                        position: 'relative'
+                                      }}>
+                                        {/* 작업자 이름 */}
+                                        <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
+                                          {member.worker}
+                                        </span>
+                                        
+                                        {/* 통계 정보 */}
+                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
+                                          <span>전체: <strong style={{ color: '#28313b' }}>{member.total_tasks}건</strong></span>
+                                          
+                                          {/* 진행 중 - 호버 툴팁 */}
+                                          <span 
+                                            style={{ 
+                                              cursor: 'pointer',
+                                              position: 'relative'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                              if (tooltip) tooltip.style.display = 'block';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                              if (tooltip) tooltip.style.display = 'none';
+                                            }}
+                                          >
+                                            진행 중: <strong style={{ color: '#FF6B6B' }}>{member.in_progress_tasks}건</strong>
+                                            <div className="tooltip" style={{
+                                              position: 'absolute',
+                                              top: '100%',
+                                              left: '50%',
+                                              transform: 'translateX(-50%)',
+                                              background: '#333',
+                                              color: '#fff',
+                                              padding: '12px 16px',
+                                              borderRadius: '8px',
+                                              fontSize: '0.85rem',
+                                              whiteSpace: 'nowrap',
+                                              zIndex: 1000,
+                                              display: 'none',
+                                              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                                              border: '1px solid #555',
+                                              marginTop: '8px'
+                                            }}>
+                                              <div style={{ fontWeight: 600, marginBottom: '8px', color: '#FF6B6B' }}>진행 중 작업 유형:</div>
+                                              <div dangerouslySetInnerHTML={{ __html: member.in_progress_types }} />
+                                              <div style={{
+                                                position: 'absolute',
+                                                bottom: '100%',
+                                                left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                width: 0,
+                                                height: 0,
+                                                borderLeft: '8px solid transparent',
+                                                borderRight: '8px solid transparent',
+                                                borderBottom: '8px solid #333'
+                                              }}></div>
+                                            </div>
+                                          </span>
+                                          
+                                          {/* 완료 - 호버 툴팁 */}
+                                          <span 
+                                            style={{ 
+                                              cursor: 'pointer',
+                                              position: 'relative'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                              if (tooltip) tooltip.style.display = 'block';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                              if (tooltip) tooltip.style.display = 'none';
+                                            }}
+                                          >
+                                            완료: <strong style={{ color: '#4CAF50' }}>{member.completed_tasks}건</strong>
+                                            <div className="tooltip" style={{
+                                              position: 'absolute',
+                                              top: '100%',
+                                              left: '50%',
+                                              transform: 'translateX(-50%)',
+                                              background: '#333',
+                                              color: '#fff',
+                                              padding: '12px 16px',
+                                              borderRadius: '8px',
+                                              fontSize: '0.85rem',
+                                              whiteSpace: 'nowrap',
+                                              zIndex: 1000,
+                                              display: 'none',
+                                              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                                              border: '1px solid #555',
+                                              marginTop: '8px'
+                                            }}>
+                                              <div style={{ fontWeight: 600, marginBottom: '8px', color: '#4CAF50' }}>완료 작업 유형:</div>
+                                              <div dangerouslySetInnerHTML={{ __html: member.completed_types }} />
+                                              <div style={{
+                                                position: 'absolute',
+                                                bottom: '100%',
+                                                left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                width: 0,
+                                                height: 0,
+                                                borderLeft: '8px solid transparent',
+                                                borderRight: '8px solid transparent',
+                                                borderBottom: '8px solid #333'
+                                              }}></div>
+                                            </div>
+                                          </span>
+                                          
+                                          <span>완료율: <strong style={{ color: '#2196F3' }}>{member.completion_rate}%</strong></span>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div style={{ 
+                                      textAlign: 'center', 
+                                      padding: '40px 20px', 
+                                      color: '#666',
+                                      background: '#fff',
+                                      borderRadius: 8,
+                                      border: '1px solid #e0e0e0'
+                                    }}>
+                                      해당 기간에 작업자별 이슈 유형 데이터가 없습니다.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </div>
+                  </div>
+                ) : '데이터 로딩 중...'
+              ) : '검색 조건을 설정해주세요'
             )}
             {activeView === 'hw' && (
               selectedProducts.length > 0 ? 'HW 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'

@@ -3,6 +3,7 @@ from typing import List, Dict, Optional
 from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
 import json
+import re
 
 def get_overall_issue_status(issues: List[Dict]) -> Dict:
     """전체 이슈 현황 계산 헬퍼 함수"""
@@ -165,6 +166,246 @@ def get_most_problematic_sites(site_index: int, start_date: str, end_date: str, 
         }
 
 
+def get_member_best_work_data(issues: List[Dict]) -> Dict: # 수정 불가
+    """최고 성과 멤버 상세 데이터 계산 헬퍼 함수"""
+    # [AE]BEST 작업인 이슈들 필터링
+    best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
+    
+    # 필요한 정보 추출
+    best_member_data = []
+    for issue in best_issues:
+        best_member_data.append({
+            'author': issue.get('author_name', ''),
+            'product': issue.get('product', ''),
+            'issue_id': issue.get('redmine_id', ''),
+            'subject': issue.get('subject', '')
+        })
+    
+    return {
+        "type": "best_member_data",
+        "data": best_member_data
+    }
+
+def get_member_best_work_summary(issues: List[Dict]) -> Dict: # 수정 불가
+    """최고 성과 멤버 요약 데이터 계산 헬퍼 함수"""
+    # [AE]BEST 작업인 이슈들 필터링
+    best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
+    
+    # 작성자별 BEST 작업 건수 카운트
+    author_counts = {}
+    for issue in best_issues:
+        author_name = issue.get('author_name', '')
+        if author_name:
+            author_counts[author_name] = author_counts.get(author_name, 0) + 1
+    
+    # 요약 데이터 생성
+    best_member_summary = []
+    for author_name, count in author_counts.items():
+        best_member_summary.append({
+            'author': author_name,
+            'count': count
+        })
+    
+    # 건수 기준으로 내림차순 정렬
+    best_member_summary.sort(key=lambda x: x['count'], reverse=True)
+    
+    return {
+        "type": "best_member_summary",
+        "data": best_member_summary
+    }
+
+def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
+    """멤버별 이슈 타입 데이터 조회"""
+    # 작성자별 통계 계산
+    member_stats = {}
+    
+    for issue in issues:
+        author_name = issue.get('author_name', 'Unknown')
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        is_closed = issue.get('is_closed', 0)
+        
+        # tracker_name에서 대괄호 제거하고 깔끔한 이름으로 변환
+        clean_tracker_name = tracker_name.replace('[AE][이슈] ', '').replace('[AE][Setup] ', '').replace('[AE] ', '')
+        
+        if author_name not in member_stats:
+            member_stats[author_name] = {
+                'total_tasks': 0,
+                'in_progress_tasks': 0,
+                'completed_tasks': 0,
+                'completion_rate': 0,
+                'in_progress_types': {},
+                'completed_types': {}
+            }
+        
+        # 전체 작업 수 증가
+        member_stats[author_name]['total_tasks'] += 1
+        
+        # 완료/진행중 작업 분류
+        if is_closed == 1:
+            member_stats[author_name]['completed_tasks'] += 1
+            # 완료 작업 유형 카운트
+            if clean_tracker_name not in member_stats[author_name]['completed_types']:
+                member_stats[author_name]['completed_types'][clean_tracker_name] = 0
+            member_stats[author_name]['completed_types'][clean_tracker_name] += 1
+        else:
+            member_stats[author_name]['in_progress_tasks'] += 1
+            # 진행중 작업 유형 카운트
+            if clean_tracker_name not in member_stats[author_name]['in_progress_types']:
+                member_stats[author_name]['in_progress_types'][clean_tracker_name] = 0
+            member_stats[author_name]['in_progress_types'][clean_tracker_name] += 1
+    
+    # 완료율 계산
+    for author_name, stats in member_stats.items():
+        if stats['total_tasks'] > 0:
+            stats['completion_rate'] = round((stats['completed_tasks'] / stats['total_tasks']) * 100, 1)
+    
+    # 결과 데이터 구성
+    member_issue_data = []
+    for author_name, stats in member_stats.items():
+        # 진행중 작업 유형 텍스트 생성
+        in_progress_text_parts = []
+        for tracker_name, count in stats['in_progress_types'].items():
+            # tracker별 고정 색상 매핑
+            if 'HW' in tracker_name:
+                color = '#FF6B6B'  # 빨간색
+            elif 'SW' in tracker_name:
+                color = '#4CAF50'  # 초록색
+            elif 'AE' in tracker_name:
+                color = '#2196F3'  # 파란색
+            else:
+                color = '#222222'  # 검정색
+            
+            in_progress_text_parts.append(f'<span style="color: {color}">{tracker_name}: {count}건</span>')
+        
+        in_progress_text = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(in_progress_text_parts) if in_progress_text_parts else "없음"
+        
+        # 완료 작업 유형 텍스트 생성
+        completed_text_parts = []
+        for tracker_name, count in stats['completed_types'].items():
+            # tracker별 고정 색상 매핑
+            if 'HW' in tracker_name:
+                color = '#FF6B6B'  # 빨간색
+            elif 'SW' in tracker_name:
+                color = '#4CAF50'  # 초록색
+            elif 'AE' in tracker_name:
+                color = '#2196F3'  # 파란색
+            else:
+                color = '#222222'  # 검정색
+            
+            completed_text_parts.append(f'<span style="color: {color}">{tracker_name}: {count}건</span>')
+        
+        completed_text = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(completed_text_parts) if completed_text_parts else "없음"
+        
+        member_issue_data.append({
+            'worker': author_name,
+            'total_tasks': stats['total_tasks'],
+            'in_progress_tasks': stats['in_progress_tasks'],
+            'completed_tasks': stats['completed_tasks'],
+            'completion_rate': stats['completion_rate'],
+            'in_progress_types': in_progress_text,
+            'completed_types': completed_text
+        })
+    
+    # 전체 작업 수로 정렬 (내림차순)
+    member_issue_data.sort(key=lambda x: x['total_tasks'], reverse=True)
+    
+    return {
+        "type": "member_issue_type",
+        "title": "작업자별 이슈 유형",
+        "data": member_issue_data
+    }
+
+def get_type_data_count(issues: List[Dict]) -> Dict:
+    """이슈 데이터를 받아서 유형별 통계를 생성하는 헬퍼 함수"""
+    
+    # tracker_name별 카운팅
+    tracker_counts = {}
+    
+    for issue in issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        tracker_counts[tracker_name] = tracker_counts.get(tracker_name, 0) + 1
+    
+    return {
+        "tracker_counts": tracker_counts
+    }
+
+def get_type_data_list(issues: List[Dict]) -> Dict:
+    """이슈 데이터를 받아서 유형별 상세 리스트를 생성하는 헬퍼 함수"""
+    
+    # tracker_name별로 이슈들을 그룹화
+    tracker_groups = {}
+    
+    for issue in issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        # tracker_name별 그룹화
+        if tracker_name not in tracker_groups:
+            tracker_groups[tracker_name] = []
+        tracker_groups[tracker_name].append(issue)
+    
+    # 각 tracker별로 상세 정보 구성
+    type_list = []
+    
+    for tracker_name, issue_list in tracker_groups.items():
+        # 완료/미완료 분리
+        completed_issues = [issue for issue in issue_list if issue.get('is_closed') == 1]
+        in_progress_issues = [issue for issue in issue_list if issue.get('is_closed') == 0]
+        
+        # 통계 계산
+        total_count = len(issue_list)
+        completed_count = len(completed_issues)
+        in_progress_count = len(in_progress_issues)
+        completion_rate = (completed_count / total_count * 100) if total_count > 0 else 0
+        
+        # Product별 통계 계산
+        product_stats = {}
+        for issue in issue_list:
+            product = issue.get('product', 'Unknown')
+            is_closed = issue.get('is_closed', 0)
+            
+            if product not in product_stats:
+                product_stats[product] = {
+                    'total': 0,
+                    'completed': 0,
+                    'in_progress': 0
+                }
+            
+            product_stats[product]['total'] += 1
+            if is_closed == 1:
+                product_stats[product]['completed'] += 1
+            else:
+                product_stats[product]['in_progress'] += 1
+        
+        # Product별 완료율 계산
+        product_details = []
+        for product, stats in product_stats.items():
+            product_completion_rate = (stats['completed'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            product_details.append({
+                'product_name': product,
+                'total_count': stats['total'],
+                'completed_count': stats['completed'],
+                'in_progress_count': stats['in_progress'],
+                'completion_rate': round(product_completion_rate, 1)
+            })
+        
+        # Product별 총 건수로 정렬 (내림차순)
+        product_details.sort(key=lambda x: x['total_count'], reverse=True)
+        
+        type_list.append({
+            "tracker_name": tracker_name,
+            "total_count": total_count,
+            "completed_count": completed_count,
+            "in_progress_count": in_progress_count,
+            "completion_rate": round(completion_rate, 1),
+            "product_details": product_details
+        })
+    
+    # 총 건수로 정렬 (내림차순)
+    type_list.sort(key=lambda x: x['total_count'], reverse=True)
+    
+    return {
+        "type_list": type_list
+    }
+
 def generate_site_tooltip(issues: List[Dict]) -> str:
     """이슈 데이터를 받아서 Site 툴팁용 요약 텍스트를 생성하는 헬퍼 함수"""
     # 완료된 일감과 미완료 일감 분리
@@ -276,9 +517,9 @@ def generate_site_tooltip(issues: List[Dict]) -> str:
     
     return tooltip_text
 
-
-def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str) -> List[int]: # 수정 불가
+def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str) -> List[int]:  # 수정 불가
     """Site 인덱스, Sub Site, Product 이름으로 해당하는 프로젝트 ID들을 찾는 헬퍼 함수"""
+    print(f"DEBUG: get_issue_project_ids called with product_name = '{product_name}'")
     try:
         db = DatabaseManager()
         
@@ -369,9 +610,15 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                         level = project.get('level', 0)
                         
                         if level == 4:
-                            # Level 4라면 Product 이름이 포함된지 확인
+                            # Level 4라면 Product 이름이 정확히 일치하는지 확인
                             project_name = project.get('project_name', '')
-                            if product_name in project_name:
+                            project_name_code = project_name
+                            # #01 앞부분만 추출
+                            match = re.match(r'^(.+?)\s+#\d+', project_name_code)
+                            if match:
+                                project_name_code = match.group(1).strip()
+                            
+                            if product_name == project_name_code:
                                 all_product_ids.append(project.get('redmine_project_id'))
                         elif level == 3:
                             # Level 3이라면 하위 프로젝트 ID 리스트를 파싱해서 products_ids에 추가
@@ -390,7 +637,14 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                             if level == 4:
                                 # Level 4라면 Product 이름이 포함된지 확인
                                 project_name = project.get('project_name', '')
-                                if product_name in project_name:
+                                project_name_code = project_name
+                                # #01 앞부분만 추출
+                                match = re.match(r'^(.+?)\s+#\d+', project_name_code)
+                                if match:
+                                    project_name_code = match.group(1).strip()
+                                
+                                if product_name == project_name_code:
+                                    print(f"DEBUG: MATCH! Adding project_id: {project.get('redmine_project_id')}, project_name: '{project_name}', project_name_code: '{project_name_code}'")
                                     all_product_ids.append(project.get('redmine_project_id'))
                 
                 return all_product_ids
@@ -401,7 +655,6 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                 projects = db.get_projects_by_name(sub_site_name)
                 
                 if not projects or len(projects) == 0:
-                    print(f"Sub Site '{sub_site_name}'을 찾을 수 없습니다.")
                     return []
                 
                 # children_ids를 JSON에서 파싱해서 ID 리스트로 변환
@@ -446,7 +699,6 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                 projects = db.get_projects_by_name(sub_site_name)
                 
                 if not projects or len(projects) == 0:
-                    print(f"Sub Site '{sub_site_name}'을 찾을 수 없습니다.")
                     return []
                 
                 # 2. children_ids를 JSON에서 파싱해서 ID 리스트로 변환
@@ -466,10 +718,16 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                     level = project.get('level', 0)
                     
                     if level == 4:
-                        # Level 4라면 Product 이름이 포함된지 확인
+                        # Level 4라면 Product 이름이 정확히 일치하는지 확인
                         project_name = project.get('project_name', '')
-                        if product_name in project_name:
-                            # Product 이름이 포함된 경우 해당 ID 저장
+                        project_name_code = project_name
+                        # #01 앞부분만 추출
+                        match = re.match(r'^(.+?)\s+#\d+', project_name_code)
+                        if match:
+                            project_name_code = match.group(1).strip()
+                        
+                        if product_name == project_name_code:
+                            # Product 이름이 정확히 일치하는 경우 해당 ID 저장
                             products.append(project.get('redmine_project_id'))
                     elif level == 3:
                         # Level 3이라면 하위 프로젝트 ID 리스트를 파싱해서 products_ids에 추가
@@ -485,16 +743,21 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                 for project in final_products:
                     level = project.get('level', 0)
                     if level == 4:
-                        # Level 4라면 Product 이름이 포함된지 확인
+                        # Level 4라면 Product 이름이 정확히 일치하는지 확인
                         project_name = project.get('project_name', '')
-                        if product_name in project_name:
-                            # Product 이름이 포함된 경우 해당 ID 저장
+                        project_name_code = project_name
+                        # #01 앞부분만 추출
+                        match = re.match(r'^(.+?)\s+#\d+', project_name_code)
+                        if match:
+                            project_name_code = match.group(1).strip()
+                        
+                        if product_name == project_name_code:
+                            # Product 이름이 정확히 일치하는 경우 해당 ID 저장
                             products.append(project.get('redmine_project_id'))
                 
                 return products
         
     except Exception as e:
-        print(f"get_issue_project_ids 실패: {e}")
         return []
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
@@ -650,7 +913,6 @@ async def get_sub_sites(request: Request): # 수정 불가
                     })
                         
             except Exception as e:
-                print(f"SITE {site_index} 처리 중 오류: {str(e)}")
                 continue
         
         # ALL을 제일 처음에 추가
@@ -801,7 +1063,6 @@ async def get_product_lists(request: Request): # 수정 불가가
                         })
                         
             except Exception as e:
-                print(f"Sub Site {sub_site_name} 처리 중 오류: {str(e)}")
                 continue
         
         # 중복 제거 (같은 이름의 Product가 여러 Sub Site에 있을 수 있음)
@@ -909,8 +1170,6 @@ async def get_all_product_list(request: Request):  # 수정 불가
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"전체 Product List 조회 실패: {str(e)}") 
 
-
-
 @router.post("/get-summary-report")
 async def get_summary_report(request: Request):
     """주간 업무보고 요약 데이터 조회 API"""
@@ -934,10 +1193,6 @@ async def get_summary_report(request: Request):
             raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
         
         # 선택된 리스트들 로그 출력
-        print(f"[get_summary_report] 선택된 SITE 인덱스: {site_indexes}")
-        print(f"[get_summary_report] 선택된 Sub Site 이름: {sub_site_names}")
-        print(f"[get_summary_report] 선택된 Product 이름: {product_names}")
-        print(f"[get_summary_report] 시작일: {start_date}, 종료일: {end_date}")
         
         # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
         all_project_ids = []
@@ -951,9 +1206,6 @@ async def get_summary_report(request: Request):
         
         # 중복 제거
         all_project_ids = list(set(all_project_ids))
-        
-        print(f"[get_summary_report] 수집된 프로젝트 ID 개수: {len(all_project_ids)}")
-        print(f"[get_summary_report] 프로젝트 ID 목록: {all_project_ids}")
         
         # project_ids와 기간을 가지고 이슈 데이터 조회
         db = DatabaseManager()
@@ -1084,13 +1336,45 @@ async def get_type_data(request: Request):
 
         if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
             raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+        # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
+        all_project_ids = []
+        
+        for site_index in site_indexes:
+            for sub_site_name in sub_site_names:
+                for product_name in product_names:
+                    # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
+                    project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+                    all_project_ids.extend(project_ids)
+        
+        # 중복 제거
+        all_project_ids = list(set(all_project_ids))
+        
+        # project_ids와 기간을 가지고 이슈 데이터 조회
+        db = DatabaseManager()
+        issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
+        
+        # 유형 데이터 로직 구현
+        type_data_count = get_type_data_count(issues)
+        type_data_list = get_type_data_list(issues)
+        print(f"type_data_count: {type_data_count}")
 
-        # TODO: 유형 데이터 로직 구현
-        pass
+        # 블럭 구조로 데이터 구성
+        blocks = [
+            {
+                "type": "type_data",
+                "data": type_data_count
+            },
+            {
+                "type": "type_data_list",
+                "data": type_data_list
+            }
+        ]
 
         return {
             "success": True,
-            "data": {}
+            "data": {
+                "blocks": blocks
+            }
         }
             
     except HTTPException:
@@ -1100,7 +1384,7 @@ async def get_type_data(request: Request):
 
 
 @router.post("/get-member-data")
-async def get_member_data(request: Request):
+async def get_member_data(request: Request): # 수정 불가
     """인원 데이터 조회 API"""
     try:
         data = await request.json()
@@ -1121,19 +1405,47 @@ async def get_member_data(request: Request):
         if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
             raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
 
+        # 선택된 리스트들 로그 출력
+        
+        # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
+        all_project_ids = []
+        
+        for site_index in site_indexes:
+            for sub_site_name in sub_site_names:
+                for product_name in product_names:
+                    # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
+                    project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+                    all_project_ids.extend(project_ids)
+        
+        # 중복 제거
+        all_project_ids = list(set(all_project_ids))
+        
+        # project_ids와 기간을 가지고 이슈 데이터 조회
+        db = DatabaseManager()
+        issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
+
         # TODO: 인원 데이터 로직 구현
-        pass
+        best_member_data = get_member_best_work_data(issues)
+        best_member_summary = get_member_best_work_summary(issues)
+        member_issue_type = get_member_issue_type(issues)
+        
+        # 블럭 리스트 초기화 (향후 여러 블럭 추가 가능)
+        blocks = []
+        blocks.append(best_member_summary)  # 요약을 먼저
+        blocks.append(best_member_data)     # 상세 리스트를 나중에
+        blocks.append(member_issue_type)    # 이슈 타입 데이터
 
         return {
             "success": True,
-            "data": {}
+            "data": {
+                "blocks": blocks
+            }
         }
             
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"인원 데이터 조회 실패: {str(e)}")
-
 
 @router.post("/get-hw-data")
 async def get_hw_data(request: Request):
