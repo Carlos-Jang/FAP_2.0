@@ -315,7 +315,7 @@ def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
         "data": member_issue_data
     }
 
-def get_type_data_count(issues: List[Dict]) -> Dict:
+def get_type_data_count(issues: List[Dict]) -> Dict: # 수정 불가
     """이슈 데이터를 받아서 유형별 통계를 생성하는 헬퍼 함수"""
     
     # tracker_name별 카운팅
@@ -329,7 +329,7 @@ def get_type_data_count(issues: List[Dict]) -> Dict:
         "tracker_counts": tracker_counts
     }
 
-def get_type_data_list(issues: List[Dict]) -> Dict:
+def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
     """이슈 데이터를 받아서 유형별 상세 리스트를 생성하는 헬퍼 함수"""
     
     # tracker_name별로 이슈들을 그룹화
@@ -356,11 +356,16 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
         in_progress_count = len(in_progress_issues)
         completion_rate = (completed_count / total_count * 100) if total_count > 0 else 0
         
-        # Product별 통계 계산
+        # Product별 통계 계산 및 제목 수집
         product_stats = {}
+        product_titles = {}
+        product_closed_status = {}
+        product_issue_numbers = {}
         for issue in issue_list:
             product = issue.get('product', 'Unknown')
             is_closed = issue.get('is_closed', 0)
+            subject = issue.get('subject', '제목 없음')
+            redmine_id = issue.get('redmine_id', 0)
             
             if product not in product_stats:
                 product_stats[product] = {
@@ -368,8 +373,14 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
                     'completed': 0,
                     'in_progress': 0
                 }
+                product_titles[product] = []
+                product_closed_status[product] = []
+                product_issue_numbers[product] = []
             
             product_stats[product]['total'] += 1
+            product_titles[product].append(subject)
+            product_closed_status[product].append(is_closed)
+            product_issue_numbers[product].append(redmine_id)
             if is_closed == 1:
                 product_stats[product]['completed'] += 1
             else:
@@ -384,7 +395,10 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
                 'total_count': stats['total'],
                 'completed_count': stats['completed'],
                 'in_progress_count': stats['in_progress'],
-                'completion_rate': round(product_completion_rate, 1)
+                'completion_rate': round(product_completion_rate, 1),
+                'issue_titles': product_titles[product],
+                'issue_closed_status': product_closed_status[product],
+                'issue_numbers': product_issue_numbers[product]
             })
         
         # Product별 총 건수로 정렬 (내림차순)
@@ -404,6 +418,184 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
     
     return {
         "type_list": type_list
+    }
+
+def get_progress_summary(issues: List[Dict]) -> Dict: # 수정 불가
+    """이슈 데이터를 받아서 진행률 요약 정보를 생성하는 헬퍼 함수"""
+    
+    # 업무 유형별로 그룹화
+    tracker_groups = {}
+    
+    for issue in issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        status_name = issue.get('status_name', 'Unknown')
+        is_closed = issue.get('is_closed', 0)
+        
+        if tracker_name not in tracker_groups:
+            tracker_groups[tracker_name] = {}
+        
+        if status_name not in tracker_groups[tracker_name]:
+            tracker_groups[tracker_name][status_name] = {
+                'total': 0,
+                'completed': 0,
+                'in_progress': 0
+            }
+        
+        tracker_groups[tracker_name][status_name]['total'] += 1
+        if is_closed == 1:
+            tracker_groups[tracker_name][status_name]['completed'] += 1
+        else:
+            tracker_groups[tracker_name][status_name]['in_progress'] += 1
+    
+    # 결과 데이터 구성
+    progress_data = []
+    
+    for tracker_name, status_groups in tracker_groups.items():
+        tracker_total = 0
+        tracker_completed = 0
+        
+        status_details = []
+        for status_name, stats in status_groups.items():
+            tracker_total += stats['total']
+            tracker_completed += stats['completed']
+            
+            status_details.append({
+                'status_name': status_name,
+                'total_count': stats['total'],
+                'completed_count': stats['completed'],
+                'in_progress_count': stats['in_progress']
+            })
+        
+        tracker_completion_rate = (tracker_completed / tracker_total * 100) if tracker_total > 0 else 0
+        
+        progress_data.append({
+            'tracker_name': tracker_name,
+            'total_count': tracker_total,
+            'completed_count': tracker_completed,
+            'in_progress_count': tracker_total - tracker_completed,
+            'completion_rate': round(tracker_completion_rate, 1),
+            'status_details': status_details
+        })
+    
+    # 전체 갯수 기준으로 정렬 (내림차순)
+    progress_data.sort(key=lambda x: x['total_count'], reverse=True)
+    
+    return {
+        "progress_data": progress_data
+    }
+
+def get_progress_detail(issues: List[Dict]) -> Dict:
+    """이슈 데이터를 받아서 진행률 상세 정보를 생성하는 헬퍼 함수"""
+    
+    # 업무 유형별로 그룹화
+    tracker_details = {}
+    
+    for issue in issues:
+        tracker_name = issue.get('tracker_name', 'Unknown')
+        status_name = issue.get('status_name', 'Unknown')
+        assigned_to = issue.get('assigned_to', '미지정')
+        subject = issue.get('subject', '제목 없음')
+        description = issue.get('description', '내용 없음')
+        redmine_id = issue.get('redmine_id', 0)
+        
+        if tracker_name not in tracker_details:
+            tracker_details[tracker_name] = {}
+        
+        if status_name not in tracker_details[tracker_name]:
+            tracker_details[tracker_name][status_name] = []
+        
+        tracker_details[tracker_name][status_name].append({
+            'assigned_to': assigned_to,
+            'subject': subject,
+            'description': description,
+            'status_name': status_name,
+            'redmine_id': redmine_id
+        })
+    
+    # 결과 데이터 구성
+    detail_data = []
+    
+
+    
+    for tracker_name, status_groups in tracker_details.items():
+        tracker_detail = {
+            'tracker_name': tracker_name,
+            'status_details': []
+        }
+        
+        # tracker_name에 따른 status_order 설정
+        current_status_order = []
+        if tracker_name == '[AE][이슈] AE Part':
+            current_status_order = [
+                '[AE][운영]이슈 등록',
+                '[AE][운영] 문제 조치', 
+                '[AE][운영] 확산 적용',
+                '[AE][운영] 조치 완료',
+                '[AE]BEST 작업'
+            ]
+        elif tracker_name == '[AE][이슈] HW Part':
+            current_status_order = [
+                '[AE][HW] 이슈 등록',
+                '[AE][HW] 개선 방향 협의',
+                '[AE][HW] 문제 조치',
+                '[AE][HW] 확산',
+                '[AE][HW] 조치 완료',
+                '[AE]BEST 작업'
+            ]
+        elif tracker_name == '[AE][이슈] SW Part':
+            current_status_order = [
+                '[AE][SW] 이슈 등록',
+                '[AE][SW] 개선 방향 협의',
+                '[사내][SW] 개발',
+                '[사내][SW] 개발 완료',
+                '[AE][SW] 현장 적용',
+                '[AE][SW] 확산 Patch',
+                '[AE][SW] 조치 완료',
+                '[AE]BEST 작업'
+            ]
+        elif tracker_name == '[AE][Setup] 이설 Setup':
+            current_status_order = [
+                '[AE][Setup] 반입&레벨링',
+                '[AE][Setup] 기초 Setup',
+                '[AE][Setup] TTTM',
+                '[AE][Setup] 자동화',
+                '[AE][Setup] Setup 완료'
+            ]
+        elif tracker_name == '[AE][Setup] 초기 Setup':
+            current_status_order = [
+                '[AE][Setup] 반입&레벨링',
+                '[AE][Setup] 기초 Setup',
+                '[AE][Setup] TTTM',
+                '[AE][Setup] 자동화',
+                '[AE][Setup] Setup 완료'
+            ]
+        elif tracker_name == '[AE] 확산 적용':
+            current_status_order = [
+                '[AE][확산] 확산 시작',
+                '[AE][확산] 확산 완료'
+            ]
+        
+        # 정의된 순서대로 status_details 정렬 (카운트가 0이어도 출력)
+        for status_name in current_status_order:
+            status_detail = {
+                'status_name': status_name,
+                'issues': status_groups.get(status_name, [])  # 없으면 빈 배열
+            }
+            tracker_detail['status_details'].append(status_detail)
+        
+        # 정의되지 않은 status_name들도 추가 (순서 뒤에)
+        for status_name, issues in status_groups.items():
+            if status_name not in current_status_order:
+                status_detail = {
+                    'status_name': status_name,
+                    'issues': issues
+                }
+                tracker_detail['status_details'].append(status_detail)
+        
+        detail_data.append(tracker_detail)
+    
+    return {
+        "progress_detail": detail_data
     }
 
 def generate_site_tooltip(issues: List[Dict]) -> str:
@@ -1301,12 +1493,44 @@ async def get_progress_data(request: Request):
         if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
             raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
 
-        # TODO: 진행율 데이터 로직 구현
-        pass
+        # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
+        all_project_ids = []
+        
+        for site_index in site_indexes:
+            for sub_site_name in sub_site_names:
+                for product_name in product_names:
+                    # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
+                    project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+                    all_project_ids.extend(project_ids)
+        
+        # 중복 제거
+        all_project_ids = list(set(all_project_ids))
+        
+        # project_ids와 기간을 가지고 이슈 데이터 조회
+        db = DatabaseManager()
+        issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
+        
+        # 진행율 데이터 로직 구현
+        progress_summary = get_progress_summary(issues)
+        progress_detail = get_progress_detail(issues)
+        
+        # 블럭 구조로 데이터 구성
+        blocks = [
+            {
+                "type": "progress_summary",
+                "data": progress_summary
+            },
+            {
+                "type": "progress_detail",
+                "data": progress_detail
+            }
+        ]
 
         return {
             "success": True,
-            "data": {}
+            "data": {
+                "blocks": blocks
+            }
         }
             
     except HTTPException:
@@ -1316,7 +1540,7 @@ async def get_progress_data(request: Request):
 
 
 @router.post("/get-type-data")
-async def get_type_data(request: Request):
+async def get_type_data(request: Request): # 수정 불가
     """유형 데이터 조회 API"""
     try:
         data = await request.json()
