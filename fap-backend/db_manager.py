@@ -493,6 +493,77 @@ class DatabaseManager:
                 'count': 0
             }
 
+    def set_update_issue_statusname(self, redmine_id: int, old_status_name: str, new_status_name: str) -> Dict:
+        """이슈 상태명 업데이트 함수"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    "success": False,
+                    "message": "DB 연결 실패"
+                }
+            
+            cursor = conn.cursor()
+            
+            # 1. 먼저 해당 이슈가 존재하고 현재 상태가 old_status_name과 일치하는지 확인
+            cursor.execute("""
+                SELECT status_name FROM issues 
+                WHERE redmine_id = %s
+            """, (redmine_id,))
+            
+            result = cursor.fetchone()
+            if not result:
+                return {
+                    "success": False,
+                    "message": f"이슈 #{redmine_id}를 찾을 수 없습니다."
+                }
+            
+            current_status_name = result[0]
+            if current_status_name != old_status_name:
+                return {
+                    "success": False,
+                    "message": f"이슈 #{redmine_id}의 현재 상태가 일치하지 않습니다. 현재: {current_status_name}, 예상: {old_status_name}"
+                }
+            
+            # 3. DB 업데이트 (status_name만 업데이트)
+            cursor.execute("""
+                UPDATE issues 
+                SET status_name = %s, updated_at = NOW()
+                WHERE redmine_id = %s
+            """, (new_status_name, redmine_id))
+            
+            conn.commit()
+            
+            # 4. 업데이트 결과 확인
+            if cursor.rowcount == 0:
+                return {
+                    "success": False,
+                    "message": f"이슈 #{redmine_id} 상태 업데이트에 실패했습니다."
+                }
+            
+            return {
+                "success": True,
+                "message": f"이슈 #{redmine_id} 상태가 성공적으로 변경되었습니다: {old_status_name} → {new_status_name}",
+                "data": {
+                    "redmine_id": redmine_id,
+                    "old_status": old_status_name,
+                    "new_status": new_status_name
+                }
+            }
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "message": f"DB 업데이트 중 오류 발생: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
 # ===== 프로젝트 관련 메서드들 =====
     
     def _row_to_project_dict(self, row) -> Dict:  # 수정 불가

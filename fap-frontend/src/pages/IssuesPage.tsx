@@ -1,5 +1,5 @@
 import Layout from './Layout';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const VIEW_TABS = [
@@ -49,6 +49,11 @@ export default function IssuesPage() {
 
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedProgressType, setSelectedProgressType] = useState<string | null>(null);
+
+  // 드래그 앤 드롭 관련 상태
+  const [draggedIssue, setDraggedIssue] = useState<any>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
   const fetchCustomerProjects = async () => {
@@ -503,6 +508,77 @@ export default function IssuesPage() {
     fetchCustomerProjects();
   }, []);
 
+  // 드래그 시작 핸들러
+  const handleDragStart = (e: React.DragEvent, issue: any, currentStatus: string) => {
+    setDraggedIssue({ ...issue, currentStatus });
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  // 드래그 오버 핸들러
+  const handleDragOver = (e: React.DragEvent, statusName: string) => {
+    e.preventDefault();
+    setDragOverStatus(statusName);
+  };
+
+  // 드래그 리브 핸들러
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+  };
+
+  // 드롭 핸들러
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+    setIsDragging(false);
+    
+    if (draggedIssue && draggedIssue.currentStatus !== targetStatus) {
+      console.log(`이슈 #${draggedIssue.redmine_id}를 ${draggedIssue.currentStatus}에서 ${targetStatus}로 이동`);
+      
+      try {
+        // API 호출해서 실제 상태 변경
+        const response = await fetch('/api/issues/update-progress-status', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            redmine_id: draggedIssue.redmine_id,
+            old_status_name: draggedIssue.currentStatus,
+            new_status_name: targetStatus
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('상태 변경 성공:', result.message);
+          
+          // 성공 시 데이터 새로고침
+          if (selectedProducts.length > 0) {
+            await loadProgressData(selectedProducts);
+          }
+        } else {
+          const errorData = await response.json();
+          console.error('상태 변경 실패:', errorData.detail);
+          alert(`상태 변경 실패: ${errorData.detail}`);
+        }
+      } catch (error) {
+        console.error('API 호출 오류:', error);
+        alert('상태 변경 중 오류가 발생했습니다.');
+      }
+    }
+    
+    setDraggedIssue(null);
+  };
+
+  // 드래그 엔드 핸들러
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDragOverStatus(null);
+    setDraggedIssue(null);
+  };
+
   return (
     <Layout>
       <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 32 }}>
@@ -859,14 +935,22 @@ export default function IssuesPage() {
 
                                       <div style={{ display: 'flex', gap: 12 }}>
                                         {tracker.status_details && tracker.status_details.map((status: any, statusIndex: number) => (
-                                          <div key={statusIndex} style={{ 
-                                            background: '#f8f9fa',
-                                            borderRadius: '6px',
-                                            border: '1px solid #e9ecef',
-                                            padding: '12px',
-                                            flex: 1,
-                                            minWidth: '200px'
-                                          }}>
+                                          <div 
+                                            key={statusIndex} 
+                                            onDragOver={(e) => handleDragOver(e, status.status_name)}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => handleDrop(e, status.status_name)}
+                                            style={{ 
+                                              background: dragOverStatus === status.status_name ? '#e3f2fd' : '#f8f9fa',
+                                              borderRadius: '6px',
+                                              border: dragOverStatus === status.status_name ? '2px dashed #2196F3' : '1px solid #e9ecef',
+                                              padding: '12px',
+                                              flex: 1,
+                                              minWidth: '200px',
+                                              transition: 'all 0.2s ease',
+                                              position: 'relative'
+                                            }}
+                                          >
                                             <h6 style={{ 
                                               margin: '0 0 8px 0', 
                                               color: '#495057', 
@@ -886,18 +970,62 @@ export default function IssuesPage() {
                                               </div>
                                             </h6>
                                             
+                                            {/* 드롭 영역 표시 */}
+                                            {dragOverStatus === status.status_name && (
+                                              <div style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                background: 'rgba(33, 150, 243, 0.1)',
+                                                border: '2px dashed #2196F3',
+                                                borderRadius: '6px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                pointerEvents: 'none',
+                                                zIndex: 10
+                                              }}>
+                                                <div style={{
+                                                  background: '#2196F3',
+                                                  color: '#fff',
+                                                  padding: '8px 16px',
+                                                  borderRadius: '4px',
+                                                  fontSize: '0.8rem',
+                                                  fontWeight: 600
+                                                }}>
+                                                  여기에 드롭하세요
+                                                </div>
+                                              </div>
+                                            )}
+                                            
                                             {/* 이슈 카드들 */}
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                                               {status.issues.map((issue: any, issueIndex: number) => (
-                                                <div key={issueIndex} style={{ 
-                                                  background: '#fff',
-                                                  borderRadius: '4px',
-                                                  border: '1px solid #e0e0e0',
-                                                  padding: '8px',
-                                                  fontSize: '0.75rem'
-                                                }}>
+                                                <div 
+                                                  key={issueIndex} 
+                                                  draggable
+                                                  onDragStart={(e) => handleDragStart(e, issue, status.status_name)}
+                                                  onDragEnd={handleDragEnd}
+                                                  style={{ 
+                                                    background: '#fff',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid #e0e0e0',
+                                                    padding: '8px',
+                                                    fontSize: '0.75rem',
+                                                    cursor: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 'grabbing' : 'grab',
+                                                    transition: 'all 0.2s ease',
+                                                    opacity: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 0.5 : 1,
+                                                    transform: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 'scale(0.95)' : 'scale(1)',
+                                                    boxShadow: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? '0 4px 8px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.1)'
+                                                  }}
+                                                >
                                                   <div style={{ marginBottom: '4px', fontWeight: 600, color: '#2196F3' }}>
                                                     #{issue.redmine_id}
+                                                  </div>
+                                                  <div style={{ marginBottom: '4px', fontSize: '0.7rem', color: '#666', fontStyle: 'italic' }}>
+                                                    작성자: {issue.author_name || '미지정'}
                                                   </div>
                                                   <div style={{ color: '#333' }}>
                                                     {issue.subject}

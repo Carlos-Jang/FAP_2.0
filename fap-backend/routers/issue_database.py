@@ -484,7 +484,7 @@ def get_progress_summary(issues: List[Dict]) -> Dict: # 수정 불가
         "progress_data": progress_data
     }
 
-def get_progress_detail(issues: List[Dict]) -> Dict:
+def get_progress_detail(issues: List[Dict]) -> Dict: # 수정 불가
     """이슈 데이터를 받아서 진행률 상세 정보를 생성하는 헬퍼 함수"""
     
     # 업무 유형별로 그룹화
@@ -509,7 +509,8 @@ def get_progress_detail(issues: List[Dict]) -> Dict:
             'subject': subject,
             'description': description,
             'status_name': status_name,
-            'redmine_id': redmine_id
+            'redmine_id': redmine_id,
+            'author_name': issue.get('author_name', '미지정')
         })
     
     # 결과 데이터 구성
@@ -1472,7 +1473,7 @@ async def get_summary_report(request: Request):
 
 
 @router.post("/get-progress-data")
-async def get_progress_data(request: Request):
+async def get_progress_data(request: Request): # 수정 불가
     """진행율 데이터 조회 API"""
     try:
         data = await request.json()
@@ -1741,4 +1742,43 @@ async def get_sw_data(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SW 데이터 조회 실패: {str(e)}")
+
+@router.put("/update-progress-status")
+async def update_progress_status(request: Request):
+    """이슈 진행 상태 업데이트 API"""
+    try:
+        data = await request.json()
+        redmine_id = data.get('redmine_id')
+        old_status_name = data.get('old_status_name')
+        new_status_name = data.get('new_status_name')
+
+        if not all([redmine_id, old_status_name, new_status_name]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: redmine_id, old_status_name, new_status_name")
+
+        # DB 매니저를 통한 로컬 DB 업데이트
+        db = DatabaseManager()
+        db_result = db.set_update_issue_statusname(redmine_id, old_status_name, new_status_name)
+        
+        if not db_result.get("success"):
+            raise HTTPException(status_code=400, detail=db_result.get("message", "DB 업데이트 실패"))
+        
+        print(f"이슈 #{redmine_id} 상태 변경: {old_status_name} → {new_status_name}")
+        
+        # TODO: 레드마인 API 호출해서 실제 이슈 상태 변경
+        # redmine_service.update_issue_status(redmine_id, new_status_name)
+        
+        return {
+            "success": True,
+            "message": f"이슈 #{redmine_id} 상태가 성공적으로 변경되었습니다: {old_status_name} → {new_status_name}",
+            "data": {
+                "redmine_id": redmine_id,
+                "old_status": old_status_name,
+                "new_status": new_status_name
+            }
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이슈 상태 업데이트 실패: {str(e)}")
 
