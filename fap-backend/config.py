@@ -1,3 +1,21 @@
+"""
+FAP 2.0 - 시스템 설정 파일 (백엔드)
+
+역할:
+- FAP 2.0 시스템의 하드코딩된 기본 설정값들을 관리
+- 레드마인 서버 연결 정보 및 API 키
+- 프로젝트 ID 매핑 (20개 고객사 + ATI 내부)
+- 기본 날짜 범위, 폰트, 기타 시스템 설정값
+
+주요 설정:
+- REDMINE_URL: 레드마인 서버 주소
+- API_KEY: 기본 레드마인 API 키
+- CUSTOMER_PROJECT_IDS: 20개 고객사 프로젝트 ID 목록
+- ATI_PROJECT_IDS: ATI 내부 프로젝트 ID 매핑
+- DEFAULT_DATE_RANGE_DAYS: 기본 날짜 범위 (30일)
+- DEFAULT_FONT: 기본 폰트 설정
+"""
+
 # config.py
 
 # Redmine 서버 기본 설정

@@ -1,6 +1,56 @@
 """
-FAP Redmine Database Manager
-레드마인 일감 데이터를 로컬 MariaDB에 저장하고 관리하는 모듈
+FAP 2.0 - 데이터베이스 관리 클래스 (백엔드)
+
+핵심 역할:
+- FAP 2.0의 로컬 데이터 저장소를 담당하는 데이터베이스 관리자
+- PMS 서버에서 받아온 데이터를 로컬 MariaDB에 저장 및 관리
+- 관리자 수동 동기화를 통한 배치 데이터 처리
+- 저장된 데이터를 기반으로 한 분석 및 조회 기능 제공
+
+주요 기능:
+- 데이터베이스 연결 관리: MariaDB 연결 설정 및 연결 풀 관리
+- 일감(Issue) 데이터 관리: PMS에서 받아온 일감 데이터 저장/조회/분석
+- 프로젝트 데이터 관리: 프로젝트 정보 및 계층 구조 저장/관리
+- 사용자 API 키 관리: 암호화/복호화, 개인별 키 저장 및 검증
+- PMS 데이터 동기화: 관리자 수동 실행으로 대량 데이터 동기화
+- 성능 최적화: 병렬 처리, 배치 처리, 연결 풀링
+
+데이터 동기화 특징:
+- 실시간이 아닌 관리자 수동 동기화 방식
+- PMS 서버에서 대량 데이터를 받아와 로컬 DB에 저장
+- 배치 처리로 효율적인 대량 데이터 처리
+- 저장된 데이터를 기반으로 분석 및 조회 수행
+
+보안 기능:
+- API 키 암호화: 사용자 개인 API 키 안전한 저장
+- 데이터 검증: 입력 데이터 유효성 검사 및 검증
+- 연결 보안: 데이터베이스 연결 보안 설정
+
+성능 최적화:
+- 병렬 처리: 여러 API 요청을 동시에 처리
+- 배치 처리: 대량 데이터 처리 시 효율성 향상
+- 연결 풀링: 데이터베이스 연결 재사용
+- 캐싱: 자주 사용되는 데이터 캐싱
+
+데이터 구조:
+- 일감 테이블: redmine_id, raw_data, created_at, updated_at
+- 프로젝트 테이블: redmine_id, raw_data, children_ids, level
+- 사용자 API 키 테이블: login, encrypted_api_key, created_at
+- 이슈 상태 테이블: status_id, status_name, is_closed
+
+PMS 연동:
+- PMS 서버 API: 일감, 프로젝트, 상태 정보 대량 조회
+- 관리자 수동 동기화: 주기적/수동으로 데이터 업데이트
+- 로컬 DB 저장: 조회한 데이터를 로컬에 저장하여 활용
+
+에러 처리:
+- 연결 실패 처리: 데이터베이스 연결 오류 복구
+- PMS API 오류 처리: PMS 서버 호출 실패 시 재시도
+- 데이터 무결성: 트랜잭션 기반 안전한 데이터 처리
+
+Redmine Service와의 차이점:
+- DB Manager: 로컬 DB 기반, 배치 처리, 주기적 동기화, 저장된 데이터 활용
+- Redmine Service: 실시간 API 호출, 즉시 응답, 직접 통신, DB 무관
 """
 
 import pymysql
@@ -564,7 +614,7 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-    def get_status_id_by_name(self, status_name: str) -> Dict:
+    def get_status_id_by_name(self, status_name: str) -> Dict: # 수정 불가
         """상태명으로 상태 ID 조회"""
         try:
             conn = self.get_connection()
@@ -938,7 +988,7 @@ class DatabaseManager:
 
 # ===== API 관련 메서드들 =====
 
-    def get_user_api_key(self, login: str) -> Dict:
+    def get_user_api_key(self, login: str) -> Dict: # 수정 불가
         """사용자 API 키 조회"""
         try:
             conn = self.get_connection()
@@ -995,7 +1045,7 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-    def save_user_api_key(self, api_key: str) -> Dict:
+    def save_user_api_key(self, api_key: str) -> Dict: # 수정 불가
         """사용자 API 키 저장 (레드마인에서 사용자 정보 가져와서 저장)"""
         try:
             # 1. API 키로 레드마인에서 사용자 정보 가져오기

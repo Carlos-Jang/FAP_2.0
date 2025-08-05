@@ -1,3 +1,27 @@
+/**
+ * FAP 2.0 - AE Issue Page (프론트엔드)
+ * 
+ * 역할:
+ * - AE Issue Page의 UI 및 상호작용 담당
+ * - 6개 탭 (summary, progress, type, member, hw, sw)으로 데이터 표시
+ * - 각 탭에서 백엔드 API 데이터를 활용하여 UI 구현
+ * - 백엔드 API (issue_database.py) 호출하여 데이터 통신
+ * 
+ * 주요 기능:
+ * - 계층적 데이터 구조: SITE → Sub Site → Product 순서로 선택
+ * - 다중 선택 지원: Ctrl+클릭으로 여러 항목 동시 선택
+ * - 실시간 상태 변경: 드래그 앤 드롭으로 이슈 상태 변경
+ * - 반응형 UI: 선택에 따라 동적으로 데이터 로드
+ * - 차트 시각화: recharts 라이브러리 사용
+ * - 사용자 경험: 직관적인 인터페이스와 부드러운 애니메이션
+ * 
+ * 데이터 흐름:
+ * 1. 사용자가 SITE → Sub Site → Product 선택
+ * 2. 선택된 조건으로 백엔드 API 호출
+ * 3. 받은 데이터를 각 탭에 맞는 UI로 렌더링
+ * 4. 드래그 앤 드롭으로 이슈 상태 변경 시 실시간 업데이트
+ */
+
 import Layout from './Layout';
 import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';

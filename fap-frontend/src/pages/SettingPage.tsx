@@ -1,3 +1,44 @@
+/**
+ * FAP 2.0 - 시스템 설정 페이지 (프론트엔드)
+ * 
+ * 핵심 역할:
+ * - FAP 2.0의 시스템 관리 및 설정을 담당하는 관리자 페이지
+ * - 사용자 인증 및 보안 관리의 핵심 인터페이스
+ * - 레드마인 데이터 동기화 관리 및 제어
+ * - 시스템 전반의 설정 및 구성 관리 UI
+ * 
+ * 주요 기능:
+ * - 개인 API 키 관리: 레드마인 API 키 입력/저장 (암호화)
+ * - 데이터 동기화 제어: 일감, 프로젝트, 이슈 상태 목록 동기화
+ * - 권한 기반 접근: 관리자만 시스템 동기화 기능 접근 가능
+ * - 보안 관리: API 키 저장 후 자동 로그아웃 처리
+ * - 반응형 UI: PC 환경에서만 접근 가능 (모바일 차단)
+ * 
+ * API 연동:
+ * - /api/settings/save-user-api-key: 개인 API 키 저장
+ * - /api/settings/sync-projects: 프로젝트 데이터 동기화
+ * - /api/settings/sync-issues: 일감 데이터 동기화
+ * - /api/settings/sync-statuses: 이슈 상태 목록 동기화
+ * 
+ * 사용자 흐름:
+ * 1. 사용자가 개인 API 키 입력 및 저장
+ * 2. 저장 성공 시 자동 로그아웃 및 로그인 페이지 이동
+ * 3. 관리자 권한 시: 데이터 동기화 기능 접근 가능
+ * 4. 동기화 실행 시 백엔드 API 호출하여 데이터 업데이트
+ * 
+ * 보안 특징:
+ * - API 키 암호화 저장 및 안전한 관리
+ * - 관리자 권한 검증 (localStorage 기반)
+ * - 저장 후 즉시 세션 클리어로 보안 강화
+ * - 모바일 환경 차단으로 관리자 전용 접근
+ * 
+ * UI 특징:
+ * - 깔끔하고 직관적인 관리자 인터페이스
+ * - 동기화 진행 상황 실시간 피드백
+ * - 반응형 디자인 (PC 전용)
+ * - 사용자 친화적인 알림 메시지
+ */
+
 import Layout from './Layout';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -46,7 +87,7 @@ export default function SettingPage() {
 
   const handleLoadProjects = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/issues/sync-projects', {}, {
+      const response = await axios.post('http://localhost:8000/api/settings/sync-projects', {}, {
         params: { limit: projectLimit }
       });
       
@@ -63,7 +104,7 @@ export default function SettingPage() {
 
   const handleLoadIssues = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/issues/sync', {}, {
+      const response = await axios.post('http://localhost:8000/api/settings/sync-issues', {}, {
         params: { limit: issueLimit }
       });
       
