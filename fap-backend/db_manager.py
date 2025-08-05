@@ -818,3 +818,158 @@ class DatabaseManager:
             return []
         finally:
             conn.close()
+
+
+# ===== API 관련 메서드들 =====
+
+    def get_user_api_key(self, login: str) -> Dict:
+        """사용자 API 키 조회"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    "success": False,
+                    "message": "DB 연결 실패"
+                }
+            
+            cursor = conn.cursor()
+            
+            # 사용자 API 키 조회
+            cursor.execute("""
+                SELECT user_id, firstname, lastname, user_name, email, api_key_encrypted
+                FROM user_api_keys 
+                WHERE user_id = %s
+            """, (login,))
+            
+            result = cursor.fetchone()
+            
+            if result:
+                # API 키 복호화
+                import base64
+                encrypted_key = result[5]
+                api_key = base64.b64decode(encrypted_key.encode()).decode()
+                
+                return {
+                    "success": True,
+                    "message": "API 키가 등록되어 있습니다.",
+                    "data": {
+                        "user_id": result[0],
+                        "firstname": result[1],
+                        "lastname": result[2],
+                        "user_name": result[3],
+                        "email": result[4],
+                        "api_key": api_key
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "등록된 API 키가 없습니다.",
+                    "data": None
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"API 키 조회 중 오류 발생: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def save_user_api_key(self, api_key: str) -> Dict:
+        """사용자 API 키 저장 (레드마인에서 사용자 정보 가져와서 저장)"""
+        try:
+            # 1. API 키로 레드마인에서 사용자 정보 가져오기
+            import requests
+            from config import REDMINE_URL
+            
+            headers = {'X-Redmine-API-Key': api_key}
+            response = requests.get(f"{REDMINE_URL}/users/current.json", headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                return {
+                    "success": False,
+                    "message": "API 키가 유효하지 않습니다. 레드마인 연결을 확인해주세요."
+                }
+            
+            user_data = response.json().get('user', {})
+            user_id = user_data.get('login', '')  # login을 user_id로 사용
+            firstname = user_data.get('firstname', '')
+            lastname = user_data.get('lastname', '')
+            user_email = f"{user_id}@ati2000.co.kr"  # login + @ati2000.co.kr
+            
+            # 이름 조합 (firstname + lastname)
+            user_name = f"{firstname} {lastname}".strip()
+            if not user_name:
+                user_name = user_data.get('login', 'Unknown User')
+            
+            # 2. DB 연결
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    "success": False,
+                    "message": "DB 연결 실패"
+                }
+            
+            cursor = conn.cursor()
+            
+            # 3. API 키 암호화
+            import base64
+            encrypted_key = base64.b64encode(api_key.encode()).decode()
+            
+            # 4. 기존 사용자 API 키가 있는지 확인 (user_id로 확인)
+            cursor.execute("""
+                SELECT id FROM user_api_keys 
+                WHERE user_id = %s
+            """, (user_id,))
+            
+            existing = cursor.fetchone()
+            
+            if existing:
+                # 기존 데이터 업데이트
+                cursor.execute("""
+                    UPDATE user_api_keys 
+                    SET firstname = %s, lastname = %s, user_name = %s, email = %s, api_key_encrypted = %s, updated_at = NOW()
+                    WHERE user_id = %s
+                """, (firstname, lastname, user_name, user_email, encrypted_key, user_id))
+            else:
+                # 새 데이터 삽입
+                cursor.execute("""
+                    INSERT INTO user_api_keys (user_id, firstname, lastname, user_name, email, api_key_encrypted, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                """, (user_id, firstname, lastname, user_name, user_email, encrypted_key))
+            
+            conn.commit()
+            
+            return {
+                "success": True,
+                "message": f"사용자 '{user_name}'의 API 키가 성공적으로 저장되었습니다.",
+                "data": {
+                    "user_id": user_id,
+                    "firstname": firstname,
+                    "lastname": lastname,
+                    "user_name": user_name,
+                    "email": user_email
+                }
+            }
+            
+        except requests.RequestException as e:
+            return {
+                "success": False,
+                "message": f"레드마인 연결 실패: {str(e)}"
+            }
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "message": f"API 키 저장 중 오류 발생: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()

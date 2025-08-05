@@ -5,11 +5,11 @@ import type { ReactNode } from 'react';
 import './MainPage.css';
 
 const ALL_NAVS = [
-  { label: 'Main', path: '/main', roles: ['Manager', 'AE', 'SW', 'PM', 'Setup'] },
-  { label: 'AE Save Report', path: '/ae-save-report', roles: ['AE'] },
-  { label: 'AE Make Report', path: '/ae-make-report', roles: ['AE'] },
-  { label: 'AE Issues', path: '/ae-issues', roles: ['Manager', 'AE'] },
-  { label: 'SW Sample TEST', path: '/sw-sample-test', roles: ['SW'] },
+  { label: 'Main', path: '/main' },
+  { label: 'AE Save Report', path: '/ae-save-report' },
+  { label: 'AE Make Report', path: '/ae-make-report' },
+  { label: 'AE Issues', path: '/ae-issues' },
+  { label: 'SW Sample TEST', path: '/sw-sample-test' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -17,17 +17,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
-  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     const id = localStorage.getItem('fap_user_id') || '';
     setUserId(id);
     const name = localStorage.getItem('fap_user_name') || '';
     setUserName(name);
-    const roles = localStorage.getItem('fap_user_roles');
-    if (roles) {
-      setUserRoles(JSON.parse(roles));
-    }
   }, []);
 
   const handleLogout = () => {
@@ -56,7 +51,18 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* 네비게이션 버튼 (설정 페이지에서는 숨김) */}
       {location.pathname !== '/setting' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginLeft: '2.5vw', marginTop: 24, marginBottom: 8 }}>
-          {ALL_NAVS.filter(nav => nav.roles.some(role => userRoles.includes(role))).map(nav => (
+          {ALL_NAVS.filter(nav => {
+            // admin인 경우 모든 탭 표시
+            if (userId === 'admin') {
+              return true;
+            }
+            // User Name에 "AE"가 포함된 경우 AE 관련 탭들만 표시
+            if (userName.includes('AE')) {
+              return nav.label === 'Main' || nav.label === 'AE Make Report' || nav.label === 'AE Issues';
+            }
+            // 기존 로직 유지 (다른 Role들의 경우)
+            return false; // userRoles가 제거되었으므로 항상 false 반환
+          }).map(nav => (
             <button
               key={nav.path}
               onClick={() => navigate(nav.path)}

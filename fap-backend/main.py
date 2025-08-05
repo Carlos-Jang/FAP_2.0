@@ -1,8 +1,9 @@
 # main.py
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from routers.redmine_service import router as projects_router
-from routers.issue_database import router as issues_router
+from routers.redmine_service import router as PMS_router
+from routers.issue_database import router as AE_issues_router
+from routers.setting_database import router as settings_router
 from pydantic import BaseModel
 import requests
 
@@ -17,8 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(projects_router)
-app.include_router(issues_router)
+app.include_router(PMS_router)
+app.include_router(AE_issues_router)
+app.include_router(settings_router)
 
 class LoginRequest(BaseModel):
     id: str

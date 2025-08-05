@@ -1,73 +1,44 @@
 import Layout from './Layout';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { normalizeText } from '../utils/textUtils';
 import axios from 'axios';
-
-const ROLES = ['Manager', 'AE', 'SW', 'PM', 'Setup'];
-const TEAMS = ['PM', 'SBU', 'HBU', 'PKG', 'Grobal', 'Sales', 'SW'];
-
-const TEAM_PARTS: { [key: string]: string[] } = {
-  SBU: ['Wafer 경기', 'Wafer 중부1', 'Wafer 중부2', 'Measure', 'Reticle'],
-  PM: ['PM', 'Setup'],
-  HBU: ['경기', '중부'],
-};
 
 export default function SettingPage() {
   const navigate = useNavigate();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<string>('');
-  const [selectedParts, setSelectedParts] = useState<string[]>([]);
-  const [userName, setUserName] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [projectLimit, setProjectLimit] = useState(1000);
   const [issueLimit, setIssueLimit] = useState(10000);
 
-  // 진입 시 localStorage에서 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem('fap_user_roles');
-    if (saved) {
-      setSelectedRoles(JSON.parse(saved));
+
+
+  const handleSaveApiKey = async () => {
+    if (!apiKey.trim()) {
+      alert('API 키를 입력해주세요.');
+      return;
     }
-    const savedTeams = localStorage.getItem('fap_user_teams');
-    if (savedTeams) {
-      setSelectedTeam(savedTeams);
+
+    try {
+      const response = await axios.post('http://localhost:8000/api/settings/save-user-api-key', {
+        api_key: apiKey
+      });
+
+      if (response.data.success) {
+        const userData = response.data.data;
+        alert(`API 키가 성공적으로 저장되었습니다!\n사용자: ${userData.user_name}\n이메일: ${userData.email}\n\n로그아웃됩니다.`);
+        setApiKey(''); // 입력 필드 비우기
+        
+        // localStorage 클리어 (로그아웃)
+        localStorage.clear();
+        
+        // 로그인 페이지로 이동
+        navigate('/login');
+      } else {
+        alert('API 키 저장 실패: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('API 키 저장 에러:', error);
+      alert('API 키 저장 중 오류가 발생했습니다.');
     }
-    const savedParts = localStorage.getItem('fap_user_parts');
-    if (savedParts) {
-      // 저장된 파트 이름에서 대괄호 제거하여 표시
-      const parts = JSON.parse(savedParts);
-      const normalizedParts = parts.map((part: string) => normalizeText(part));
-      setSelectedParts(normalizedParts);
-    }
-    const savedUserName = localStorage.getItem('fap_user_name') || '';
-    setUserName(savedUserName);
-  }, []);
-
-  const handleRoleChange = (role: string) => {
-    setSelectedRoles(prev =>
-      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
-    );
-  };
-
-  const handleTeamChange = (team: string) => {
-    setSelectedTeam(team);
-  };
-
-  const handlePartChange = (part: string) => {
-    setSelectedParts(prev =>
-      prev.includes(part) ? prev.filter(p => p !== part) : [...prev, part]
-    );
-  };
-
-  const handleSave = () => {
-    // 파트 이름에서 대괄호 제거 후 저장
-    const normalizedParts = selectedParts.map(part => normalizeText(part));
-    localStorage.setItem('fap_user_roles', JSON.stringify(selectedRoles));
-    localStorage.setItem('fap_user_teams', selectedTeam);
-    localStorage.setItem('fap_user_parts', JSON.stringify(normalizedParts));
-    localStorage.setItem('fap_user_name', userName);
-    alert('설정이 저장되었습니다!');
   };
   const handleExit = () => {
     navigate('/main');
@@ -166,60 +137,31 @@ export default function SettingPage() {
         <div style={{ display: 'flex', width: '100%', gap: 16, marginBottom: 24, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, alignItems: 'flex-start', display: 'flex', flexDirection: 'column', color: '#222', fontSize: '1.2rem', fontWeight: 500, marginTop: 0 }}>
             <div style={{ marginBottom: 18 }}>
-              <span style={{ fontWeight: 600, fontSize: '1.15rem', marginRight: 16 }}>사용자 이름 :</span>
+              <span style={{ fontWeight: 600, fontSize: '1.15rem', marginRight: 16 }}>API 키 입력 :</span>
               <input
-                type="text"
-                value={userName}
-                onChange={e => setUserName(e.target.value)}
-                placeholder="예: 시스템 관리자"
-                style={{ fontSize: '1.1rem', padding: '6px 12px', border: '1px solid #ccc', borderRadius: 6, minWidth: 220 }}
+                type="password"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="레드마인 API 키를 입력하세요"
+                style={{ fontSize: '1.1rem', padding: '6px 12px', border: '1px solid #ccc', borderRadius: 6, minWidth: 220, marginRight: 8 }}
               />
+              <button
+                onClick={() => handleSaveApiKey()}
+                style={{
+                  fontSize: '1rem',
+                  padding: '6px 16px',
+                  background: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                저장
+              </button>
             </div>
-            <div style={{ marginBottom: 18 }}>
-              <span style={{ fontWeight: 600, fontSize: '1.15rem', marginRight: 16 }}>Role :</span>
-              {ROLES.map(role => (
-                <label key={role} style={{ marginRight: 18, fontWeight: 400 }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedRoles.includes(role)}
-                    onChange={() => handleRoleChange(role)}
-                    style={{ marginRight: 6 }}
-                  />
-                  {role}
-                </label>
-              ))}
-            </div>
-            <div style={{ marginBottom: 18 }}>
-              <span style={{ fontWeight: 600, fontSize: '1.15rem', marginRight: 16 }}>Team :</span>
-              {TEAMS.map(team => (
-                <label key={team} style={{ marginRight: 18, fontWeight: 400 }}>
-                  <input
-                    type="radio"
-                    name="team-group"
-                    checked={selectedTeam === team}
-                    onChange={() => handleTeamChange(team)}
-                    style={{ marginRight: 6 }}
-                  />
-                  {team}
-                </label>
-              ))}
-            </div>
-            {TEAM_PARTS[selectedTeam] && (
-              <div style={{ marginBottom: 18 }}>
-                <span style={{ fontWeight: 600, fontSize: '1.15rem', marginRight: 16 }}>Part :</span>
-                {TEAM_PARTS[selectedTeam].map(part => (
-                  <label key={part} style={{ marginRight: 18, fontWeight: 400 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedParts.includes(part)}
-                      onChange={() => handlePartChange(part)}
-                      style={{ marginRight: 6 }}
-                    />
-                    {part}
-                  </label>
-                ))}
-              </div>
-            )}
+
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-end', marginTop: 0 }}>
             {/* 시스템 관리자용 버튼들 */}
@@ -282,7 +224,7 @@ export default function SettingPage() {
                 </div>
               </div>
             )}
-            <button style={btnStyle} onClick={handleSave}>save</button>
+            
             <button style={btnStyle} onClick={handleExit}>exit</button>
           </div>
         </div>

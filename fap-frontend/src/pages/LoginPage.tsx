@@ -1,6 +1,7 @@
 // 수정 불가 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -20,8 +21,29 @@ export default function LoginPage() {
         body: JSON.stringify({ id, password })
       });
       if (res.ok) {
+        // 기존 localStorage 클리어
+        localStorage.clear();
+        
+        // 새로운 로그인 정보 저장
         localStorage.setItem('fap_logged_in', '1');
         localStorage.setItem('fap_user_id', id);
+        
+        // API 키 존재 여부 확인
+        try {
+          const apiResponse = await axios.get(`http://localhost:8000/api/settings/check-user-api-key/${id}`);
+          
+          if (apiResponse.data.success) {
+            // API 키가 있으면 사용자 정보를 localStorage에 저장
+            const userData = apiResponse.data.data;
+            localStorage.setItem('fap_user_name', userData.user_name);
+            localStorage.setItem('fap_user_email', userData.email);
+          }
+          // API 키가 없으면 MainPage에서 알림 표시할 예정
+        } catch (error) {
+          // API 키 확인 중 오류가 발생해도 로그인은 성공으로 처리
+          console.error('API 키 확인 중 오류:', error);
+        }
+        
         navigate('/main');
       } else {
         const data = await res.json();
