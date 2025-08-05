@@ -57,4 +57,21 @@ async def check_user_api_key(login: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"API 키 조회 실패: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"API 키 조회 실패: {str(e)}")
+
+@router.post("/sync-statuses")
+async def sync_issue_statuses():
+    """이슈 상태 목록 동기화"""
+    try:
+        # DB 매니저를 통한 이슈 상태 동기화
+        db = DatabaseManager()
+        result = db.sync_issue_status()
+        
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", ""),
+            "data": result.get("data", {})
+        }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이슈 상태 동기화 실패: {str(e)}") 

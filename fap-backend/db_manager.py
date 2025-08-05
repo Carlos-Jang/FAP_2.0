@@ -493,7 +493,123 @@ class DatabaseManager:
                 'count': 0
             }
 
-    def set_update_issue_statusname(self, redmine_id: int, old_status_name: str, new_status_name: str) -> Dict:
+    def sync_issue_status(self) -> Dict: # 수정 불가
+        """이슈 상태 목록 동기화"""
+        conn = None
+        cursor = None
+        try:
+            # Redmine API 호출
+            url = f"{REDMINE_URL}/issue_statuses.json"
+            headers = {'X-Redmine-API-Key': API_KEY}
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                issue_statuses = data.get('issue_statuses', [])
+                
+                # DB 연결
+                conn = self.get_connection()
+                if not conn:
+                    return {
+                        "success": False,
+                        "message": "DB 연결 실패"
+                    }
+                
+                cursor = conn.cursor()
+                
+                # 기존 issue_statuses 테이블 전체 삭제
+                cursor.execute("DELETE FROM issue_statuses")
+                
+                # 새로운 이슈 상태 데이터 삽입
+                saved_count = 0
+                
+                for status in issue_statuses:
+                    status_id = status.get('id')
+                    status_name = status.get('name')
+                    is_closed = status.get('is_closed', False)
+                    
+                    if status_id and status_name:
+                        cursor.execute("""
+                            INSERT INTO issue_statuses (id, status_name, is_closed)
+                            VALUES (%s, %s, %s)
+                        """, (status_id, status_name, is_closed))
+                        saved_count += 1
+                
+                conn.commit()
+                
+                return {
+                    "success": True,
+                    "message": f"이슈 상태 동기화 완료! 총 {saved_count}개 상태 저장됨",
+                    "data": {
+                        "count": saved_count
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Redmine API 호출 실패: {response.status_code}"
+                }
+                
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "message": f"이슈 상태 동기화 실패: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def get_status_id_by_name(self, status_name: str) -> Dict:
+        """상태명으로 상태 ID 조회"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    "success": False,
+                    "message": "DB 연결 실패"
+                }
+            
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id FROM issue_statuses 
+                WHERE status_name = %s
+            """, (status_name,))
+            
+            result = cursor.fetchone()
+            
+            if result:
+                return {
+                    "success": True,
+                    "message": "상태 ID 조회 성공",
+                    "data": {
+                        "status_id": result[0],
+                        "status_name": status_name
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"상태명 '{status_name}'에 해당하는 ID를 찾을 수 없습니다."
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"상태 ID 조회 중 오류 발생: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def set_update_issue_statusname(self, redmine_id: int, old_status_name: str, new_status_name: str) -> Dict: # 수정 불가
         """이슈 상태명 업데이트 함수"""
         try:
             conn = self.get_connection()

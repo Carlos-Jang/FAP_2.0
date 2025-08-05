@@ -12,6 +12,7 @@ import os
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
+# ===== Redmine 관련 메서드들 PMS to FAP =====
 
 def fetch_redmine_issue(issue_id: int):  # 수정 불가
     """
@@ -51,6 +52,106 @@ def get_project_name(project_id: int):  # 수정 불가
         return project.get('name', '')
     return None
 
+# ===== Redmine 관련 메서드들 FAP to PMS =====
+
+def update_issue_status(issue_id: int, old_status_name: str, new_status_name: str, api_key: str) -> dict:
+    """
+    Redmine에서 이슈 상태를 업데이트하는 함수
+    사용자의 개인 API 키를 사용하여 상태 변경
+    """
+    try:
+        # 1. 레드마인에서 일감 번호로 일감 정보를 가져온다
+        url = f"{REDMINE_URL}/issues/{issue_id}.json"
+        headers = {"X-Redmine-API-Key": api_key}
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            return {
+                "success": False,
+                "message": f"이슈 #{issue_id} 정보를 가져올 수 없습니다. (상태 코드: {response.status_code})"
+            }
+        
+        issue_data = response.json().get("issue", {})
+        current_status_name = issue_data.get("status", {}).get("name", "")
+        
+        print(f"DEBUG: 이슈 #{issue_id} 전체 데이터: {issue_data}")
+        print(f"DEBUG: 이슈 #{issue_id} 현재 상태: {current_status_name}")
+        print(f"DEBUG: 예상 상태: {old_status_name}")
+        print(f"DEBUG: 변경할 상태: {new_status_name}")
+        
+        # 2. 일감 정보에 status_name이 올드 네임인지 확인한다
+        if current_status_name != old_status_name:
+            return {
+                "success": False,
+                "message": f"이슈 #{issue_id}의 현재 상태가 일치하지 않습니다. 현재: {current_status_name}, 예상: {old_status_name}"
+            }
+        
+        # 3. 상태명을 status_id로 변환
+        from db_manager import DatabaseManager
+        db = DatabaseManager()
+        status_result = db.get_status_id_by_name(new_status_name)
+        
+        if not status_result.get("success"):
+            return {
+                "success": False,
+                "message": f"상태명 '{new_status_name}'에 해당하는 ID를 찾을 수 없습니다."
+            }
+        
+        new_status_id = status_result["data"]["status_id"]
+        print(f"DEBUG: 상태명 '{new_status_name}' → 상태 ID: {new_status_id}")
+        
+        # 4. Redmine API 호출하여 이슈 상태 업데이트 (status_id 사용)
+        update_headers = {
+            "X-Redmine-API-Key": api_key,
+            "Content-Type": "application/json"
+        }
+        
+        update_data = {
+            "issue": {
+                "status_id": new_status_id
+            }
+        }
+        
+        print(f"DEBUG: Redmine PUT URL: {url}")
+        print(f"DEBUG: Redmine PUT Headers: {dict(update_headers)}")
+        print(f"DEBUG: Redmine PUT Data: {update_data}")
+        
+        update_response = requests.put(url, headers=update_headers, json=update_data, timeout=10)
+        
+        print(f"DEBUG: Redmine PUT 응답 상태 코드: {update_response.status_code}")
+        print(f"DEBUG: Redmine PUT 응답 내용: {update_response.text}")
+        
+        if update_response.status_code == 204:  # Redmine 성공 응답
+            return {
+                "success": True,
+                "message": f"이슈 #{issue_id} 상태가 성공적으로 변경되었습니다: {old_status_name} → {new_status_name}",
+                "data": {
+                    "issue_id": issue_id,
+                    "old_status": old_status_name,
+                    "new_status": new_status_name,
+                    "new_status_id": new_status_id
+                }
+            }
+        else:
+            # 변경이 안되면 권한이 없습니다 리턴
+            return {
+                "success": False,
+                "message": "권한이 없습니다."
+            }
+            
+    except requests.exceptions.RequestException as e:
+        return {
+            "success": False,
+            "message": f"Redmine API 연결 오류: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"이슈 상태 업데이트 중 오류 발생: {str(e)}"
+        }
+
+# ===== Router API AE Make Report 관련 =====
 @router.post('/find-report')
 async def find_report(request: Request):  # 수정 불가
     """
@@ -120,6 +221,7 @@ async def get_site(request: Request):  # 수정 불가
     site = get_project_name(parent2) if parent2 else None
     return {"site": site, "location": location}
 
+# ===== 미사용 TEST 코드 =====
 @router.get('/make-report-download')
 def make_report_download():  
     """

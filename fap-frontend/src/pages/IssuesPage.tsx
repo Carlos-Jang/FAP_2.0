@@ -537,6 +537,13 @@ export default function IssuesPage() {
       console.log(`이슈 #${draggedIssue.redmine_id}를 ${draggedIssue.currentStatus}에서 ${targetStatus}로 이동`);
       
       try {
+        // 사용자 ID 가져오기
+        const userId = localStorage.getItem('fap_user_id');
+        if (!userId) {
+          alert('사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+          return;
+        }
+
         // API 호출해서 실제 상태 변경
         const response = await fetch('/api/issues/update-progress-status', {
           method: 'PUT',
@@ -546,7 +553,8 @@ export default function IssuesPage() {
           body: JSON.stringify({
             redmine_id: draggedIssue.redmine_id,
             old_status_name: draggedIssue.currentStatus,
-            new_status_name: targetStatus
+            new_status_name: targetStatus,
+            user_id: userId
           })
         });
 

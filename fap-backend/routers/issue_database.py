@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query, HTTPException, Request
 from typing import List, Dict, Optional
 from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
+from .redmine_service import update_issue_status
 import json
 import re
 
@@ -837,7 +838,6 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
                                     project_name_code = match.group(1).strip()
                                 
                                 if product_name == project_name_code:
-                                    print(f"DEBUG: MATCH! Adding project_id: {project.get('redmine_project_id')}, project_name: '{project_name}', project_name_code: '{project_name_code}'")
                                     all_product_ids.append(project.get('redmine_project_id'))
                 
                 return all_product_ids
@@ -1751,21 +1751,48 @@ async def update_progress_status(request: Request):
         redmine_id = data.get('redmine_id')
         old_status_name = data.get('old_status_name')
         new_status_name = data.get('new_status_name')
+        user_id = data.get('user_id')  # 프론트에서 전달받은 사용자 ID
 
-        if not all([redmine_id, old_status_name, new_status_name]):
-            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: redmine_id, old_status_name, new_status_name")
+        if not all([redmine_id, old_status_name, new_status_name, user_id]):
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: redmine_id, old_status_name, new_status_name, user_id")
 
-        # DB 매니저를 통한 로컬 DB 업데이트
+        # DB 매니저를 통한 API 키 조회
         db = DatabaseManager()
+        user_data = db.get_user_api_key(user_id)
+        
+        if not user_data.get("success"):
+            raise HTTPException(status_code=400, detail="API 키가 등록되지 않았습니다. Setting 페이지에서 API 키를 등록해주세요.")
+        
+        api_key = user_data.get("data", {}).get("api_key")
+        if not api_key:
+            raise HTTPException(status_code=400, detail="API 키를 가져올 수 없습니다.")
+
+        # 1. 레드마인 API 호출해서 실제 이슈 상태 변경 시도
+        redmine_result = update_issue_status(redmine_id, old_status_name, new_status_name, api_key)
+        
+        if not redmine_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"레드마인 업데이트 실패: {redmine_result.get('message')}")
+        
+        # 2. 레드마인에서 실제 상태 재확인 (권한 문제 등으로 실제 변경되지 않았을 수 있음)
+        from .redmine_service import fetch_redmine_issue
+        updated_issue = fetch_redmine_issue(redmine_id)
+        
+        if not updated_issue:
+            raise HTTPException(status_code=400, detail="이슈 정보를 가져올 수 없습니다.")
+        
+        actual_status_name = updated_issue.get("status", {}).get("name", "")
+        
+        # 3. 실제 상태가 변경되었는지 확인
+        if actual_status_name != new_status_name:
+            raise HTTPException(status_code=400, detail=f"권한이 없어 상태 변경이 되지 않았습니다. 현재 상태: {actual_status_name}")
+        
+        # 4. 실제 상태가 변경되었을 때만 로컬 DB 업데이트
         db_result = db.set_update_issue_statusname(redmine_id, old_status_name, new_status_name)
         
         if not db_result.get("success"):
             raise HTTPException(status_code=400, detail=db_result.get("message", "DB 업데이트 실패"))
         
         print(f"이슈 #{redmine_id} 상태 변경: {old_status_name} → {new_status_name}")
-        
-        # TODO: 레드마인 API 호출해서 실제 이슈 상태 변경
-        # redmine_service.update_issue_status(redmine_id, new_status_name)
         
         return {
             "success": True,
