@@ -29,7 +29,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const VIEW_TABS = [
   { key: 'summary', label: 'summary' },
   { key: 'progress', label: 'progress' },
-  { key: 'type', label: 'type' },
+  // { key: 'type', label: 'type' },
   { key: 'member', label: 'member' },
   { key: 'hw', label: 'HW' },
   { key: 'sw', label: 'SW' },
@@ -55,6 +55,46 @@ function getWeekAgo() {
   return d.toISOString().slice(0, 10);
 }
 
+// 날짜 +1일 헬퍼 함수 (종료일을 다음날로 조정하여 오늘 수정한 일감도 포함되도록 함)
+function adjustEndDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+// 마크다운 설명을 파싱하여 모든 섹션을 추출하는 헬퍼 함수
+function parseDescription(description: string): { problem: string; cause: string; action: string; result: string; note: string; atiReport: string } {
+  if (!description) {
+    return { problem: '', cause: '', action: '', result: '', note: '', atiReport: '' };
+  }
+
+  // 문제 추출
+  const problemMatch = description.match(/### 문제\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const problem = problemMatch ? problemMatch[1].trim() : '';
+
+  // 원인 추출
+  const causeMatch = description.match(/### 원인\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const cause = causeMatch ? causeMatch[1].trim() : '';
+
+  // 조치 추출
+  const actionMatch = description.match(/### 조치\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const action = actionMatch ? actionMatch[1].trim() : '';
+
+  // 결과 추출
+  const resultMatch = description.match(/### 결과\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const result = resultMatch ? resultMatch[1].trim() : '';
+
+  // 특이사항 추출
+  const noteMatch = description.match(/### 특이사항\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const note = noteMatch ? noteMatch[1].trim() : '';
+
+  // ATI 내부 공유 추출
+  const atiReportMatch = description.match(/### ATI 내부 공유\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const atiReport = atiReportMatch ? atiReportMatch[1].trim() : '';
+
+  return { problem, cause, action, result, note, atiReport };
+}
+
 export default function IssuesPage() {
   const [dateFrom, setDateFrom] = useState(getWeekAgo());
   const [dateTo, setDateTo] = useState(getToday());
@@ -73,11 +113,17 @@ export default function IssuesPage() {
 
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedProgressType, setSelectedProgressType] = useState<string | null>(null);
+  const [selectedProductForMembers, setSelectedProductForMembers] = useState<string | null>(null);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   // 드래그 앤 드롭 관련 상태
   const [draggedIssue, setDraggedIssue] = useState<any>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // 모달 관련 상태
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<any>(null);
 
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
   const fetchCustomerProjects = async () => {
@@ -368,7 +414,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -394,7 +440,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -420,7 +466,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -446,7 +492,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -472,7 +518,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -498,7 +544,7 @@ export default function IssuesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           start_date: dateFrom,
-          end_date: dateTo,
+          end_date: adjustEndDate(dateTo),
           site_indexes: selectedSiteIndexes,
           sub_site_names: selectedSubSites,
           product_names: productNames
@@ -609,6 +655,18 @@ export default function IssuesPage() {
     setIsDragging(false);
     setDragOverStatus(null);
     setDraggedIssue(null);
+  };
+
+  // 모달 열기 핸들러
+  const handleModalOpen = (issue: any) => {
+    setSelectedIssue(issue);
+    setIsModalOpen(true);
+  };
+
+  // 모달 닫기 핸들러
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedIssue(null);
   };
 
   return (
@@ -1040,13 +1098,14 @@ export default function IssuesPage() {
                                                   draggable
                                                   onDragStart={(e) => handleDragStart(e, issue, status.status_name)}
                                                   onDragEnd={handleDragEnd}
+                                                  onClick={() => handleModalOpen(issue)}
                                                   style={{ 
                                                     background: '#fff',
                                                     borderRadius: '4px',
                                                     border: '1px solid #e0e0e0',
                                                     padding: '8px',
                                                     fontSize: '0.75rem',
-                                                    cursor: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 'grabbing' : 'grab',
+                                                    cursor: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 'grabbing' : 'pointer',
                                                     transition: 'all 0.2s ease',
                                                     opacity: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 0.5 : 1,
                                                     transform: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? 'scale(0.95)' : 'scale(1)',
@@ -1087,128 +1146,495 @@ export default function IssuesPage() {
                 issueData ? (
                   <div style={{ width: '100%', minHeight: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
-                      {/* 블럭들을 순서대로 렌더링 */}
                       {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
-                        switch(block.type) {
-                          case 'overall_status':
+                        switch (block.type) {
+                          case 'progress_summary':
                             return (
                               <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>전체 이슈 현황</h4>
-                                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28313b', marginBottom: 12 }}>
-                                  {block.data.total_issues}건
-                                </div>
-                                <div style={{ display: 'flex', gap: 24, fontSize: '1rem', color: '#555', marginBottom: 12 }}>
-                                  <span><strong>진행 중 일감:</strong> <strong style={{ color: '#FF6B6B' }}>{block.data.in_progress_count}건</strong></span>
-                                  <span><strong>완료된 일감:</strong> <strong style={{ color: '#4CAF50' }}>{block.data.completed_count}건</strong></span>
-                                  <span><strong>완료율:</strong> <strong style={{ color: '#2196F3' }}>{block.data.completion_rate}%</strong></span>
-                                </div>
-                                {block.data.tracker_text && (
-                                  <div style={{ fontSize: '1rem', color: '#555' }}>
-                                    <div style={{ fontWeight: 600, marginBottom: 8 }}>유형별 일감</div>
-                                    <div dangerouslySetInnerHTML={{ __html: block.data.tracker_text }} />
+                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>진행률 요약</h4>
+                                
+                                {/* 전체 통계와 버튼을 하나의 흰색 칸에 묶기 */}
+                                {block.data.progress_data && block.data.progress_data.length > 0 && (
+                                  <div style={{ 
+                                    background: '#fff',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef',
+                                    marginBottom: '16px',
+                                    padding: '16px'
+                                  }}>
+                                    {/* 전체 통계 */}
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'center', 
+                                      gap: 24, 
+                                      marginBottom: '16px'
+                                    }}>
+                                      {(() => {
+                                        const totalStats = block.data.progress_data.reduce((acc: any, tracker: any) => {
+                                          acc.total += tracker.total_count;
+                                          acc.completed += tracker.completed_count;
+                                          acc.inProgress += tracker.in_progress_count;
+                                          return acc;
+                                        }, { total: 0, completed: 0, inProgress: 0 });
+                                        
+                                        const overallCompletionRate = totalStats.total > 0 ? 
+                                          Math.round((totalStats.completed / totalStats.total) * 100 * 10) / 10 : 0;
+                                        
+                                        return (
+                                          <>
+                                            <div style={{ textAlign: 'center' }}>
+                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>전체</div>
+                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#28313b' }}>{totalStats.total}건</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>진행 중</div>
+                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#FF6B6B' }}>{totalStats.inProgress}건</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료</div>
+                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4CAF50' }}>{totalStats.completed}건</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료율</div>
+                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#2196F3' }}>{overallCompletionRate}%</div>
+                                            </div>
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                    
+                                    {/* 업무 유형별 버튼 */}
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      flexWrap: 'wrap', 
+                                      gap: 8, 
+                                      justifyContent: 'center'
+                                    }}>
+                                      {block.data.progress_data && block.data.progress_data.map((tracker: any, trackerIndex: number) => (
+                                        <button
+                                          key={trackerIndex}
+                                          style={{
+                                            padding: '6px 12px',
+                                            background: selectedProgressType === tracker.tracker_name ? '#1565C0' : ['#28313b', '#b30000', '#a07000', '#008000', '#6a0dad'][trackerIndex % 5],
+                                            border: '1px solid #e0e0e0',
+                                            borderRadius: '4px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500,
+                                            color: '#fff',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (selectedProgressType !== tracker.tracker_name) {
+                                              e.currentTarget.style.opacity = '0.8';
+                                            }
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.opacity = '1';
+                                          }}
+                                          onClick={() => setSelectedProgressType(selectedProgressType === tracker.tracker_name ? null : tracker.tracker_name)}
+                                        >
+                                          {tracker.tracker_name}
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
-                              </div>
-                            );
-                          case 'problematic_products':
-                            return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>가장 문제가 많이 발생한 설비군 Top 3</h4>
+                                
+                                
+                                {/* 리스트 - 선택된 유형만 표시 */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  {block.data.map((product: any, productIndex: number) => (
-                                    <div key={productIndex} style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'space-between', 
-                                      alignItems: 'center',
-                                      padding: '12px 16px',
-                                      background: '#fff',
-                                      borderRadius: 6,
-                                      border: '1px solid #e0e0e0'
-                                    }}>
-                                      <span style={{ fontWeight: 600, color: '#222' }}>
-                                        {product.product}
-                                      </span>
-                                      <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
-                                        <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{product.in_progress}건</strong></span>
-                                        <span>완료: <strong style={{ color: '#4CAF50' }}>{product.completed}건</strong></span>
-                                        <span>완료율: <strong style={{ color: '#2196F3' }}>{product.completion_rate}%</strong></span>
+                                  {block.data.progress_data && block.data.progress_data
+                                    .filter((tracker: any) => !selectedProgressType || tracker.tracker_name === selectedProgressType)
+                                    .map((tracker: any, trackerIndex: number) => (
+                                      <div key={trackerIndex} style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        padding: '12px 16px',
+                                        background: '#fff',
+                                        borderRadius: '6px',
+                                        border: '1px solid #e0e0e0'
+                                      }}>
+                                        <span style={{ fontWeight: 600, color: '#222', fontSize: '1rem' }}>
+                                          {tracker.tracker_name}
+                                        </span>
+                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
+                                          <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{tracker.in_progress_count}건</strong></span>
+                                          <span>완료: <strong style={{ color: '#4CAF50' }}>{tracker.completed_count}건</strong></span>
+                                          <span>완료율: <strong style={{ color: '#2196F3' }}>{tracker.completion_rate}%</strong></span>
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    ))}
                                 </div>
                               </div>
                             );
-                          case 'problematic_sites':
+                          case 'type_data_list':
+                            // selectedProgressType이 없으면 블록을 숨김
+                            if (!selectedProgressType) {
+                              return null;
+                            }
                             return (
                               <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 12px 0', color: '#222' }}>Site 별 작업 현황</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  {block.data.map((site: any, siteIndex: number) => (
-                                    <div key={siteIndex} style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'space-between', 
-                                      alignItems: 'center',
-                                      padding: '12px 16px',
-                                      background: '#fff',
-                                      borderRadius: 6,
-                                      border: '1px solid #e0e0e0',
-                                      cursor: 'pointer',
-                                      position: 'relative'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (site.tooltip) {
-                                        const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                        if (tooltip) tooltip.style.display = 'block';
-                                      }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                      if (tooltip) tooltip.style.display = 'none';
-                                    }}
-                                    >
-                                      <span style={{ fontWeight: 600, color: '#222' }}>
-                                        {site.site}
-                                      </span>
-                                      <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
-                                        <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{site.in_progress}건</strong></span>
-                                        <span>완료: <strong style={{ color: '#4CAF50' }}>{site.completed}건</strong></span>
-                                        <span>완료율: <strong style={{ color: '#2196F3' }}>{site.completion_rate}%</strong></span>
+                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>
+                                  유형별 상세 현황 - {selectedProgressType}
+                                </h4>
+                                <div style={{ display: 'flex', gap: 20 }}>
+                                  {/* 왼쪽: 설비군별 현황 */}
+                                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {block.data.type_list && block.data.type_list.length > 0 ? (
+                                      (() => {
+                                        // selectedProgressType이 있으면 해당 유형만 필터링, 없으면 전체 표시
+                                        const filteredTypeList = selectedProgressType 
+                                          ? block.data.type_list.filter((typeItem: any) => typeItem.tracker_name === selectedProgressType)
+                                          : block.data.type_list;
+                                        
+                                        if (filteredTypeList.length === 0) {
+                                          return (
+                                            <div style={{ 
+                                              textAlign: 'center', 
+                                              padding: '40px 20px', 
+                                              color: '#666',
+                                              background: '#fff',
+                                              borderRadius: 8,
+                                              border: '1px solid #e0e0e0'
+                                            }}>
+                                              {selectedProgressType ? `${selectedProgressType}의 상세 데이터가 없습니다.` : '상세 데이터가 없습니다.'}
+                                            </div>
+                                          );
+                                        }
+                                        
+                                        return filteredTypeList.map((typeItem: any, typeIndex: number) => (
+                                          <div key={typeIndex} style={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'flex-start',
+                                            padding: '16px 20px',
+                                            background: '#fff',
+                                            borderRadius: 8,
+                                            border: '1px solid #e0e0e0',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                            gap: '20px',
+                                            width: '100%',
+                                            boxSizing: 'border-box',
+                                            overflow: 'hidden'
+                                          }}>
+                                            {/* 유형 이름 */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                                              <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
+                                                {typeItem.tracker_name}
+                                              </span>
+                                              
+                                              {/* 통계 정보 */}
+                                              <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555', alignItems: 'center', marginBottom: '16px' }}>
+                                                <span>전체: <strong style={{ color: '#28313b' }}>{typeItem.total_count}건</strong></span>
+                                                <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{typeItem.in_progress_count}건</strong></span>
+                                                <span>완료: <strong style={{ color: '#4CAF50' }}>{typeItem.completed_count}건</strong></span>
+                                                <span>완료율: <strong style={{ color: '#2196F3' }}>{typeItem.completion_rate}%</strong></span>
+                                              </div>
+                                              
+                                              {/* Product 상세 정보 */}
+                                              {typeItem.product_details && typeItem.product_details.length > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                  <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 600 }}>설비군별 현황:</span>
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                    {typeItem.product_details.map((product: any, productIndex: number) => (
+                                                      <div 
+                                                        key={productIndex} 
+                                                        style={{ 
+                                                          padding: '12px 16px',
+                                                          background: selectedProductForMembers === product.product_name ? '#e3f2fd' : '#f8f9fa',
+                                                          borderRadius: 8,
+                                                          border: selectedProductForMembers === product.product_name ? '2px solid #2196F3' : '1px solid #e9ecef',
+                                                          width: '100%',
+                                                          boxSizing: 'border-box',
+                                                          wordBreak: 'break-word',
+                                                          cursor: 'pointer',
+                                                          transition: 'all 0.2s ease'
+                                                        }}
+                                                        onClick={() => setSelectedProductForMembers(selectedProductForMembers === product.product_name ? null : product.product_name)}
+                                                      >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                          <span style={{ 
+                                                            fontSize: '0.85rem', 
+                                                            color: '#495057',
+                                                            fontWeight: 600
+                                                          }}>
+                                                            {product.product_name}
+                                                          </span>
+                                                          <span style={{ 
+                                                            fontSize: '0.75rem', 
+                                                            color: product.completion_rate < 50 ? '#dc3545' : 
+                                                                   product.completion_rate < 80 ? '#ffc107' : '#28a745',
+                                                            fontWeight: 600
+                                                          }}>
+                                                            {product.completion_rate}%
+                                                          </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.8rem', color: '#666' }}>
+                                                          <span>전체: <strong>{product.total_count}건</strong></span>
+                                                          <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{product.in_progress_count}건</strong></span>
+                                                          <span>완료: <strong style={{ color: '#4CAF50' }}>{product.completed_count}건</strong></span>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ));
+                                      })()
+                                    ) : (
+                                      <div style={{ 
+                                        textAlign: 'center', 
+                                        padding: '40px 20px', 
+                                        color: '#666',
+                                        background: '#fff',
+                                        borderRadius: 8,
+                                        border: '1px solid #e0e0e0'
+                                      }}>
+                                        데이터가 없습니다.
                                       </div>
-                                      
-                                      {/* 툴팁 */}
-                                      {site.tooltip && (
-                                        <div className="tooltip" style={{
-                                          position: 'fixed',
-                                          top: '150px',
-                                          right: 'calc(30vw)',
-                                          background: '#333',
-                                          color: '#fff',
-                                          padding: '16px 20px',
-                                          borderRadius: '8px',
-                                          fontSize: '0.9rem',
-                                          maxWidth: '1200px',
-                                          minWidth: '800px',
-                                          zIndex: 1000,
-                                          display: 'none',
-                                          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-                                          border: '1px solid #555'
-                                        }}>
-                                          <div dangerouslySetInnerHTML={{ __html: site.tooltip }} />
-                                          <div style={{
-                                            position: 'absolute',
-                                            top: '100%',
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
-                                            width: 0,
-                                            height: 0,
-                                            borderLeft: '8px solid transparent',
-                                            borderRight: '8px solid transparent',
-                                            borderTop: '8px solid #333'
-                                          }}></div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
+                                    )}
+                                  </div>
+                                  
+                                  {/* 우측: 선택된 설비의 인원별 현황 */}
+                                   {selectedProductForMembers && (
+                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        <h5 style={{ margin: '0 0 0px 0', color: '#222', fontSize: '1rem' }}>
+                                         {selectedProductForMembers} 작업 인원
+                                       </h5>
+                                       {(() => {
+                                         // 선택된 설비의 인원 정보 찾기
+                                         const selectedProductData = block.data.type_list
+                                           .filter((typeItem: any) => typeItem.tracker_name === selectedProgressType)
+                                           .flatMap((typeItem: any) => typeItem.product_details)
+                                           .find((product: any) => product.product_name === selectedProductForMembers);
+                                         
+                                         if (!selectedProductData || !selectedProductData.member_details) {
+                                           return (
+                                             <div style={{ 
+                                               textAlign: 'center', 
+                                               padding: '40px 20px', 
+                                               color: '#666',
+                                               background: '#fff',
+                                               borderRadius: 8,
+                                               border: '1px solid #e0e0e0'
+                                             }}>
+                                               인원 정보가 없습니다.
+                                             </div>
+                                           );
+                                         }
+                                         
+                                         return (
+                                           <div style={{ 
+                                             display: 'flex', 
+                                             flexWrap: 'wrap', 
+                                             gap: 20,
+                                             padding: '20px',
+                                             background: '#fff',
+                                             borderRadius: 8,
+                                             border: '1px solid #e0e0e0',
+                                             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                           }}>
+                                             {selectedProductData.member_details.map((member: any, memberIndex: number) => (
+                                               <div 
+                                                 key={memberIndex} 
+                                                 style={{ 
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   padding: '12px 16px',
+                                                   background: selectedMembers.includes(member.member_name) ? '#e3f2fd' : '#f8f9fa',
+                                                   borderRadius: 6,
+                                                   border: selectedMembers.includes(member.member_name) ? '2px solid #2196F3' : '1px solid #e9ecef',
+                                                   minWidth: 'fit-content',
+                                                   cursor: 'pointer',
+                                                   transition: 'all 0.2s ease',
+                                                   position: 'relative'
+                                                 }}
+                                                 onClick={(e) => {
+                                                   const isCtrlPressed = e.ctrlKey || e.metaKey;
+                                                   if (isCtrlPressed) {
+                                                     // Ctrl 키가 눌린 경우: 다중 선택
+                                                     setSelectedMembers(prev => {
+                                                       if (prev.includes(member.member_name)) {
+                                                         return prev.filter(name => name !== member.member_name);
+                                                       } else {
+                                                         return [...prev, member.member_name];
+                                                       }
+                                                     });
+                                                   } else {
+                                                     // Ctrl 키가 안 눌린 경우: 토글 선택 (이미 선택된 경우 해제)
+                                                     setSelectedMembers(prev => {
+                                                       if (prev.includes(member.member_name)) {
+                                                         return prev.filter(name => name !== member.member_name);
+                                                       } else {
+                                                         return [member.member_name];
+                                                       }
+                                                     });
+                                                   }
+                                                 }}
+                                                 onMouseEnter={(e) => {
+                                                   // 호버 툴팁 표시
+                                                   const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                                   if (tooltip) {
+                                                     tooltip.style.display = 'block';
+                                                   }
+                                                 }}
+                                                 onMouseLeave={(e) => {
+                                                   // 호버 툴팁 숨김
+                                                   const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
+                                                   if (tooltip) {
+                                                     tooltip.style.display = 'none';
+                                                   }
+                                                 }}
+                                               >
+                                                 {/* 완료율 표시 점 */}
+                                                 <div style={{
+                                                   width: '8px',
+                                                   height: '8px',
+                                                   borderRadius: '50%',
+                                                   backgroundColor: member.completion_rate >= 80 ? '#28a745' : 
+                                                                  member.completion_rate >= 50 ? '#ffc107' : '#dc3545',
+                                                   marginRight: '8px',
+                                                   flexShrink: 0
+                                                 }} />
+                                                 <span style={{ 
+                                                   fontSize: '0.9rem', 
+                                                   fontWeight: 600, 
+                                                   color: '#28313b',
+                                                   whiteSpace: 'nowrap'
+                                                 }}>
+                                                   {member.member_name}
+                                                 </span>
+                                                 
+                                                 {/* 호버 툴팁 */}
+                                                 <div 
+                                                   className="tooltip"
+                                                   style={{
+                                                     position: 'absolute',
+                                                     top: '100%',
+                                                     left: '0',
+                                                     background: '#333',
+                                                     color: '#fff',
+                                                     padding: '8px 12px',
+                                                     borderRadius: '4px',
+                                                     fontSize: '0.8rem',
+                                                     whiteSpace: 'nowrap',
+                                                     zIndex: 1000,
+                                                     display: 'none',
+                                                     boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                                                   }}
+                                                 >
+                                                   <div style={{ marginBottom: '4px' }}>
+                                                     완료율: <strong style={{ color: member.completion_rate < 50 ? '#ff6b6b' : 
+                                                                           member.completion_rate < 80 ? '#ffd93d' : '#6bcf7f' }}>
+                                                       {member.completion_rate}%
+                                                     </strong>
+                                                   </div>
+                                                   <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+                                                     <span>전체: <strong>{member.total_count}건</strong></span>
+                                                     <span>진행 중: <strong style={{ color: '#ff6b6b' }}>{member.in_progress_count}건</strong></span>
+                                                     <span>완료: <strong style={{ color: '#6bcf7f' }}>{member.completed_count}건</strong></span>
+                                                   </div>
+                                                 </div>
+                                               </div>
+                                             ))}
+                                           </div>
+                                         );
+                                       })()}
+                                       <h5 style={{ margin: '30px 0 0px 0', color: '#222', fontSize: '1rem' }}>
+                                         {selectedProductForMembers} 작업 목록 
+                                       </h5>
+                                       
+                                       {/* 일감 목록 */}
+                                       {(() => {
+                                         // 선택된 설비의 일감 정보 찾기
+                                         const selectedProductDataForIssues = block.data.type_list
+                                           .filter((typeItem: any) => typeItem.tracker_name === selectedProgressType)
+                                           .flatMap((typeItem: any) => typeItem.product_details)
+                                           .find((product: any) => product.product_name === selectedProductForMembers);
+                                         
+                                         if (selectedProductDataForIssues && selectedProductDataForIssues.issue_titles) {
+                                           // 선택된 인원들의 일감만 필터링
+                                           let filteredIssues: any[] = [];
+                                           
+                                           if (selectedMembers.length > 0) {
+                                             // 선택된 인원들의 일감 수집
+                                             selectedMembers.forEach(memberName => {
+                                               const memberData = selectedProductDataForIssues.member_details.find(
+                                                 (member: any) => member.member_name === memberName
+                                               );
+                                               if (memberData && memberData.issues) {
+                                                 filteredIssues = [...filteredIssues, ...memberData.issues];
+                                               }
+                                             });
+                                           } else {
+                                             // 선택된 인원이 없으면 전체 일감 표시
+                                             filteredIssues = selectedProductDataForIssues.issue_titles.map((title: string, index: number) => ({
+                                               subject: title,
+                                               redmine_id: selectedProductDataForIssues.issue_numbers[index],
+                                               is_closed: selectedProductDataForIssues.issue_closed_status[index]
+                                             }));
+                                           }
+                                           
+                                           return (
+                                             <div style={{ 
+                                               marginTop: '4px',
+                                               padding: '16px',
+                                               background: '#fff',
+                                               borderRadius: '8px',
+                                               border: '1px solid #e0e0e0'
+                                             }}>
+                                               <div style={{ 
+                                                 display: 'flex', 
+                                                 flexDirection: 'column', 
+                                                 gap: '6px'
+                                               }}>
+                                                 {filteredIssues.map((issue: any, index: number) => (
+                                                   <div 
+                                                     key={index}
+                                                     style={{
+                                                       padding: '8px 10px',
+                                                       background: '#f8f9fa',
+                                                       borderRadius: '4px',
+                                                       border: '1px solid #e9ecef',
+                                                       fontSize: '0.85rem',
+                                                       color: '#333',
+                                                       lineHeight: '1.4',
+                                                       display: 'flex',
+                                                       alignItems: 'center',
+                                                       gap: '8px'
+                                                     }}
+                                                   >
+                                                     <button 
+                                                       onClick={() => window.open(`https://pms.ati2000.co.kr/issues/${issue.redmine_id}`, '_blank')}
+                                                       style={{
+                                                         padding: '2px 6px',
+                                                         background: issue.is_closed === 1 ? '#28a745' : '#dc3545',
+                                                         border: '1px solid #dee2e6',
+                                                         borderRadius: '3px',
+                                                         fontSize: '0.7rem',
+                                                         color: '#fff',
+                                                         cursor: 'pointer',
+                                                         flexShrink: 0,
+                                                         minWidth: '40px'
+                                                       }}
+                                                     >
+                                                       #{issue.redmine_id}
+                                                     </button>
+                                                     {issue.subject}
+                                                   </div>
+                                                 ))}
+                                               </div>
+                                             </div>
+                                           );
+                                         }
+                                         return null;
+                                       })()}
+                                     </div>
+                                   )}
                                 </div>
                               </div>
                             );
@@ -1221,7 +1647,7 @@ export default function IssuesPage() {
                 ) : '데이터 로딩 중...'
               ) : '검색 조건을 설정해주세요'
             )}
-            {activeView === 'type' && (
+            {false && activeView === 'type' && (
               selectedProducts.length > 0 ? (
                 issueData ? (
                   <div style={{ width: '100%', minHeight: '100%' }}>
@@ -1912,6 +2338,201 @@ export default function IssuesPage() {
           </div>
         </div>
       </div>
+
+      {/* 일감 상세 모달 */}
+      {isModalOpen && selectedIssue && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+          }}
+          onClick={handleModalClose}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 닫기 버튼 */}
+            <button
+              onClick={handleModalClose}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f0f0f0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              ×
+            </button>
+
+            {/* 모달 헤더 */}
+            <div style={{ marginBottom: '20px', paddingRight: '40px' }}>
+              <a
+                href={`https://pms.ati2000.co.kr/issues/${selectedIssue.redmine_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ 
+                  fontSize: '1.2rem', 
+                  fontWeight: 600, 
+                  color: '#2196F3',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#1976D2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#2196F3';
+                }}
+              >
+                #{selectedIssue.redmine_id}
+              </a>
+            </div>
+
+            {/* 일감 정보 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* 제목 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>제목</div>
+                <div style={{ fontSize: '1.1rem', color: '#222', lineHeight: '1.4' }}>
+                  {selectedIssue.subject}
+                </div>
+              </div>
+
+              {/* 문제 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>문제</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).problem}
+                </div>
+              </div>
+
+              {/* 원인 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>원인</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).cause}
+                </div>
+              </div>
+
+              {/* 조치 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>조치</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).action}
+                </div>
+              </div>
+
+              {/* 결과 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>결과</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).result}
+                </div>
+              </div>
+
+              {/* 특이사항 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>특이사항</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).note}
+                </div>
+              </div>
+
+              {/* ATI 내부 보고 */}
+              <div>
+                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>ATI 내부 보고</div>
+                <div style={{ 
+                  color: '#222', 
+                  lineHeight: '1.6',
+                  wordBreak: 'break-word',
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  {parseDescription(selectedIssue.description).atiReport}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

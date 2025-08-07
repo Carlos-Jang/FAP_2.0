@@ -32,8 +32,12 @@ from typing import List, Dict, Optional
 from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
 from .redmine_service import update_issue_status
+
 import json
 import re
+
+
+
 
 def get_overall_issue_status(issues: List[Dict]) -> Dict:
     """전체 이슈 현황 계산 헬퍼 함수"""
@@ -359,7 +363,7 @@ def get_type_data_count(issues: List[Dict]) -> Dict: # 수정 불가
         "tracker_counts": tracker_counts
     }
 
-def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
+def get_type_data_list(issues: List[Dict]) -> Dict: 
     """이슈 데이터를 받아서 유형별 상세 리스트를 생성하는 헬퍼 함수"""
     
     # tracker_name별로 이슈들을 그룹화
@@ -391,11 +395,13 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
         product_titles = {}
         product_closed_status = {}
         product_issue_numbers = {}
+        product_members = {}
         for issue in issue_list:
             product = issue.get('product', 'Unknown')
             is_closed = issue.get('is_closed', 0)
             subject = issue.get('subject', '제목 없음')
             redmine_id = issue.get('redmine_id', 0)
+            assigned_to = issue.get('author_name', 'Unknown')
             
             if product not in product_stats:
                 product_stats[product] = {
@@ -406,20 +412,57 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
                 product_titles[product] = []
                 product_closed_status[product] = []
                 product_issue_numbers[product] = []
+                product_members[product] = {}
             
             product_stats[product]['total'] += 1
             product_titles[product].append(subject)
             product_closed_status[product].append(is_closed)
             product_issue_numbers[product].append(redmine_id)
+            
+            # 인원별 통계 추가
+            if assigned_to not in product_members[product]:
+                product_members[product][assigned_to] = {
+                    'total': 0,
+                    'completed': 0,
+                    'in_progress': 0,
+                    'issues': []
+                }
+            
+            product_members[product][assigned_to]['total'] += 1
+            product_members[product][assigned_to]['issues'].append({
+                'subject': subject,
+                'redmine_id': redmine_id,
+                'is_closed': is_closed
+            })
+            
             if is_closed == 1:
                 product_stats[product]['completed'] += 1
+                product_members[product][assigned_to]['completed'] += 1
             else:
                 product_stats[product]['in_progress'] += 1
+                product_members[product][assigned_to]['in_progress'] += 1
         
         # Product별 완료율 계산
         product_details = []
         for product, stats in product_stats.items():
             product_completion_rate = (stats['completed'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            
+            # 인원별 정보 정리
+            member_details = []
+            for member_name, member_stats in product_members[product].items():
+                member_completion_rate = (member_stats['completed'] / member_stats['total'] * 100) if member_stats['total'] > 0 else 0
+                member_details.append({
+                    'member_name': member_name,
+                    'total_count': member_stats['total'],
+                    'completed_count': member_stats['completed'],
+                    'in_progress_count': member_stats['in_progress'],
+                    'completion_rate': round(member_completion_rate, 1),
+                    'issues': member_stats['issues']
+                })
+            
+            # 인원별 총 건수로 정렬 (내림차순)
+            member_details.sort(key=lambda x: x['total_count'], reverse=True)
+            
             product_details.append({
                 'product_name': product,
                 'total_count': stats['total'],
@@ -428,7 +471,8 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
                 'completion_rate': round(product_completion_rate, 1),
                 'issue_titles': product_titles[product],
                 'issue_closed_status': product_closed_status[product],
-                'issue_numbers': product_issue_numbers[product]
+                'issue_numbers': product_issue_numbers[product],
+                'member_details': member_details
             })
         
         # Product별 총 건수로 정렬 (내림차순)
@@ -1433,60 +1477,13 @@ async def get_summary_report(request: Request):
         db = DatabaseManager()
         issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
         
-        # 전체 이슈 현황 블럭 생성 (항상 포함)
-        overall_status = get_overall_issue_status(issues)
-        blocks = [{"type": "overall_status", "data": overall_status}]
-        
-        # 조건별 블럭 추가
-        # if sub_site_name == "ALL":
-        #    if product_name == "ALL":
-                # Sub Site ALL + Product List ALL
-                # 가장 문제가 많은 Site Top 3 블럭 추가
-                # problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
-                # blocks.append(problematic_sites)
-                # 가장 문제가 많은 Product Top 3 블럭 추가
-                # problematic_products = get_most_problematic_products(issues)
-                # blocks.append(problematic_products)
-        #        pass
-        #    else:
-                # Sub Site ALL + Product List 특정
-                # 가장 문제가 많은 Site Top 3 블럭 추가
-                # problematic_sites = get_most_problematic_sites(site_index, start_date, end_date, product_name)
-                # blocks.append(problematic_sites)
-        #        pass
-        # else:
-        #     if product_name == "ALL":
-                # Sub Site 특정 + Product List ALL
-                # 가장 문제가 많은 Product Top 3 블럭 추가
-                # problematic_products = get_most_problematic_products(issues)
-                # blocks.append(problematic_products)
-        #        pass
-        #    else:
-                # Sub Site 특정 + Product List 특정
-                # 기능 1, 기능 5 추가
-        #        pass
-        
-        # 다중 선택 조건별 블럭 추가
-        # Sub Site가 "ALL"이거나 여러개가 선택된 경우
-        has_multiple_sub_sites = "ALL" in sub_site_names or len(sub_site_names) > 1
-        
-        # Product List가 "ALL"이거나 여러개가 선택된 경우
-        has_multiple_products = "ALL" in product_names or len(product_names) > 1
-        
-        if has_multiple_sub_sites:
-            if has_multiple_products:
-                # 조건 1: Sub Site ALL/다중 + Product ALL/다중
-                pass
-            else:
-                # 조건 2: Sub Site ALL/다중 + Product 한개
-                pass
-        else:
-            if has_multiple_products:
-                # 조건 3: Sub Site 한개 + Product ALL/다중
-                pass
-            else:
-                # 조건 4: Sub Site 한개 + Product 한개
-                pass
+        # 진행률 요약 블럭과 유형별 상세 현황 블럭 생성
+        progress_summary = get_progress_summary(issues)
+        type_data_list = get_type_data_list(issues)
+        blocks = [
+            {"type": "progress_summary", "data": progress_summary},
+            {"type": "type_data_list", "data": type_data_list}
+        ]
         
         return {
             "success": True,
