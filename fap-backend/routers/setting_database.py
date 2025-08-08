@@ -136,10 +136,10 @@ async def sync_issues(limit: int = Query(100, ge=1, le=10000, description="동�
 
 @router.post("/sync-projects")
 async def sync_projects(limit: int = Query(1000, ge=1, le=1000, description="동기화할 프로젝트 수")):  # 수정 불가
-    """레드마인에서 프로젝트 동기화"""
+    """레드마인에서 프로젝트 동기화 (빠른 동기화)"""
     try:
         db = DatabaseManager()
-        result = db.sync_projects(limit)
+        result = db.sync_projects_fast(limit)  # 빠른 동기화 함수 사용
         
         if result['success']:
             return {

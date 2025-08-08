@@ -985,6 +985,281 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def sync_projects_fast(self, limit: int = 1000) -> Dict:
+        """레드마인에서 프로젝트 목록을 빠르게 가져와서 DB에 저장 (자식 프로젝트 조회 없이)"""
+        try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            print(f"레드마인 API 빠른 병렬 호출 중... (50개씩 배치 처리)")
+            
+            # 1. 먼저 전체 프로젝트 개수 확인
+            test_url = f"{REDMINE_URL}/projects.json"
+            test_params = {'limit': 1, 'key': API_KEY}
+            test_response = requests.get(test_url, params=test_params, timeout=10)
+            
+            if test_response.status_code != 200:
+                return {
+                    'success': False,
+                    'error': f'레드마인 API 연결 실패: {test_response.status_code}',
+                    'count': 0
+                }
+            
+            # 2. 50개씩 나누어서 병렬로 API 호출
+            all_projects = []
+            batch_size = 50
+            offset = 0
+            
+            def fetch_projects_batch(batch_offset):
+                """50개씩 프로젝트를 가져오는 함수"""
+                url = f"{REDMINE_URL}/projects.json"
+                params = {
+                    'limit': batch_size,
+                    'offset': batch_offset,
+                    'key': API_KEY
+                }
+                
+                try:
+                    response = requests.get(url, params=params, timeout=30)
+                    if response.status_code == 200:
+                        data = response.json()
+                        projects = data.get('projects', [])
+                        print(f"배치 {batch_offset//batch_size + 1}: {len(projects)}개 프로젝트 가져옴")
+                        return projects
+                    else:
+                        print(f"배치 {batch_offset//batch_size + 1}: API 호출 실패 (status: {response.status_code})")
+                        return []
+                except Exception as e:
+                    print(f"배치 {batch_offset//batch_size + 1}: 에러 - {str(e)}")
+                    return []
+            
+            # 병렬로 여러 배치를 동시에 처리
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = []
+                
+                # 입력받은 limit만큼 배치 계산
+                max_batches = (limit + batch_size - 1) // batch_size  # 올림 나눗셈
+                print(f"총 {max_batches}개 배치를 처리합니다 (최대 {limit}개 프로젝트)")
+                
+                for i in range(max_batches):
+                    batch_offset = i * batch_size
+                    future = executor.submit(fetch_projects_batch, batch_offset)
+                    futures.append(future)
+                
+                # 모든 배치 결과 수집
+                for future in as_completed(futures):
+                    batch_projects = future.result()
+                    if batch_projects:
+                        all_projects.extend(batch_projects)
+                    # 빈 배치가 나와도 계속 진행 (더 많은 데이터가 있을 수 있음)
+            
+            if not all_projects:
+                return {
+                    'success': True,
+                    'message': '동기화할 프로젝트가 없습니다.',
+                    'count': 0
+                }
+            
+            print(f"총 {len(all_projects)}개 프로젝트를 가져왔습니다.")
+            
+            # 3. DB에 저장 (projects_default 테이블)
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    'success': False,
+                    'error': 'DB 연결 실패',
+                    'count': 0
+                }
+            
+            cursor = conn.cursor()
+            
+            # projects_default 테이블이 없으면 생성
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS projects_default (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    redmine_id INT,
+                    project_name VARCHAR(255),
+                    raw_data JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 기존 projects_default 테이블 전체 삭제
+            print("기존 프로젝트 데이터 삭제 중...")
+            cursor.execute("TRUNCATE TABLE projects_default")
+            
+            # 새로운 프로젝트 데이터 삽입
+            print("새로운 프로젝트 데이터 삽입 중...")
+            saved_count = 0
+            
+            for project in all_projects:
+                redmine_project_id = project.get('id')
+                project_name = project.get('name', '')
+                
+                if not redmine_project_id or not project_name:
+                    continue
+                
+                # 단순 저장 (관계 설정 없이)
+                cursor.execute("""
+                    INSERT INTO projects_default (redmine_id, project_name, raw_data) 
+                    VALUES (%s, %s, %s)
+                """, (
+                    redmine_project_id, 
+                    project_name, 
+                    json.dumps(project, ensure_ascii=False)
+                ))
+                saved_count += 1
+            
+            conn.commit()
+            conn.close()
+            
+            # 관계 분석 및 projects 테이블에 저장
+            self.analyze_and_save_project_relationships()
+            
+            return {
+                'success': True,
+                'message': f'프로젝트 동기화 완료: {saved_count}개 프로젝트 저장 (관계 분석 포함)',
+                'count': len(all_projects),
+                'saved': saved_count,
+                'updated': 0
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'프로젝트 빠른 동기화 실패: {str(e)}',
+                'count': 0
+            }
+
+    def analyze_and_save_project_relationships(self) -> Dict:
+        """projects_default에서 관계 분석해서 projects 테이블에 저장"""
+        try:
+            print("프로젝트 관계 분석 및 저장 시작...")
+            
+            # 1. DB 연결
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    'success': False,
+                    'error': 'DB 연결 실패'
+                }
+            
+            cursor = conn.cursor()
+            
+            # 2. 기존 projects 테이블 전체 삭제
+            print("기존 projects 테이블 데이터 삭제 중...")
+            cursor.execute("TRUNCATE TABLE projects")
+            
+            # 3. projects_default에서 모든 프로젝트 데이터 가져오기
+            print("projects_default에서 프로젝트 데이터 가져오는 중...")
+            cursor.execute("SELECT redmine_id, project_name, raw_data FROM projects_default")
+            projects_data = cursor.fetchall()
+            
+            if not projects_data:
+                return {
+                    'success': False,
+                    'error': 'projects_default에 데이터가 없습니다.'
+                }
+            
+            print(f"총 {len(projects_data)}개 프로젝트 데이터를 가져왔습니다.")
+            
+            # 4. 프로젝트 데이터를 딕셔너리로 변환
+            projects_dict = {}
+            for row in projects_data:
+                redmine_id = row[0]
+                project_name = row[1]
+                raw_data = row[2]
+                
+                try:
+                    project_info = json.loads(raw_data)
+                    projects_dict[redmine_id] = {
+                        'id': redmine_id,
+                        'name': project_name,
+                        'raw_data': raw_data,
+                        'parent': project_info.get('parent', {}),
+                        'children_ids': []
+                    }
+                except json.JSONDecodeError:
+                    continue
+            
+            # 5. 부모-자식 관계 분석
+            print("부모-자식 관계 분석 중...")
+            for project_id, project_info in projects_dict.items():
+                parent = project_info.get('parent', {})
+                parent_id = parent.get('id')
+                
+                if parent_id and parent_id in projects_dict:
+                    # 부모가 있으면 자식 리스트에 추가
+                    projects_dict[parent_id]['children_ids'].append(project_id)
+            
+            # 6. 레벨 계산
+            print("프로젝트 레벨 계산 중...")
+            for project_id, project_info in projects_dict.items():
+                level = self.calculate_project_level(project_id, projects_dict)
+                project_info['level'] = level
+            
+            # 7. projects 테이블에 저장
+            print("projects 테이블에 데이터 저장 중...")
+            saved_count = 0
+            
+            for project_id, project_info in projects_dict.items():
+                cursor.execute("""
+                    INSERT INTO projects (redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at) 
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                """, (
+                    project_info['id'],
+                    project_info['name'],
+                    project_info['raw_data'],
+                    json.dumps(project_info['children_ids'], ensure_ascii=False),
+                    project_info['level']
+                ))
+                saved_count += 1
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"프로젝트 관계 분석 완료: {saved_count}개 프로젝트 저장")
+            
+            return {
+                'success': True,
+                'message': f'프로젝트 관계 분석 완료: {saved_count}개 프로젝트 저장',
+                'count': saved_count
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'프로젝트 관계 분석 실패: {str(e)}'
+            }
+    
+    def calculate_project_level(self, project_id: int, projects_dict: Dict) -> int:
+        """프로젝트 레벨 계산"""
+        from config import ATI_PROJECT_IDS, CUSTOMER_PROJECT_IDS
+        
+        project_info = projects_dict.get(project_id, {})
+        parent = project_info.get('parent', {})
+        parent_id = parent.get('id')
+        
+        # 특정 프로젝트 하드코딩 레벨 설정
+        if project_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 00. ATI 본사
+            return 11
+        elif project_id == ATI_PROJECT_IDS['ATI_SAMPLE_EVALUATION']:  # ATI 시료 평가
+            return 21
+        elif project_id == ATI_PROJECT_IDS['ATI_GUIDE']:  # PMS System 안내
+            return 31
+        
+        # 레벨 설정 로직
+        if parent_id is None:
+            return 1  # 최상위 (고객사)
+        elif parent_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 부모가 00. ATI 본사인 경우
+            return 12
+        elif not project_info.get('children_ids'):  # 자식이 없으면
+            return 4  # 최하위 (설비/라인)
+        elif parent_id in CUSTOMER_PROJECT_IDS:
+            return 2  # 고객사의 직접 하위 (지역)
+        else:
+            return 3  # 지역의 하위 (건물명)
+
 
 # ===== API 관련 메서드들 =====
 
