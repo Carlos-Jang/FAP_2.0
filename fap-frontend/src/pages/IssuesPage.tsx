@@ -70,7 +70,9 @@ const darkThemeVars = {
   
   // 카드 효과
   '--card-hover-transform': 'translateY(-2px)',
-  '--card-hover-shadow': 'var(--shadow-hover)'
+  '--card-hover-shadow': 'var(--shadow-hover)',
+  '--success-color': '#28a745',
+  '--danger-color': '#dc3545'
 };
 
 const VIEW_TABS = [
@@ -728,26 +730,94 @@ export default function IssuesPage() {
 
   return (
     <Layout>
-      <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 32 }}>
+      <div style={{
+        display: 'flex',
+        height: 'calc(100vh - 100px)',
+        gap: 32
+      }}>
         {/* 좌측 대시보드 메뉴/필터 */}
-        <div style={{ width: 500, minWidth: 340, background: '#f7f9fc', borderRadius: 8, boxShadow: 'var(--color-shadow)', padding: 24, display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}>
+        <div style={{
+          width: 500,
+          minWidth: 340,
+          background: '#f7f9fc',
+          borderRadius: 8,
+          boxShadow: 'var(--color-shadow)',
+          padding: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+          height: '100%'
+        }}>
           {/* 기간 선택 */}
           <div>
-            <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>Search Date</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '1rem', padding: '4px 8px', border: '1px solid #ccc', borderRadius: 6, width: 120 }} max={dateTo} />
-              <span style={{ color: '#222', fontWeight: 600, fontSize: '1.1rem' }}>~</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '1rem', padding: '4px 8px', border: '1px solid #ccc', borderRadius: 6, width: 120 }} min={dateFrom} />
+            <div style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              color: '#222'
+            }}>Search Date</div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{
+                fontSize: '1rem',
+                padding: '4px 8px',
+                border: '1px solid #ccc',
+                borderRadius: 6,
+                width: 120
+              }} max={dateTo} />
+              <span style={{
+                color: '#222',
+                fontWeight: 600,
+                fontSize: '1.1rem'
+              }}>~</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{
+                fontSize: '1rem',
+                padding: '4px 8px',
+                border: '1px solid #ccc',
+                borderRadius: 6,
+                width: 120
+              }} min={dateFrom} />
             </div>
           </div>
 
                     {/* SITE & Sub Site & Product List 버튼 영역 */}
-          <div style={{ display: 'flex', gap: 0, flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            gap: 0,
+            flex: 1
+          }}>
             {/* SITE 버튼 영역 */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100% ) / 3)'  }}>
-              <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>SITE</div>
-              <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              maxWidth: 'calc((100% ) / 3)'
+            }}>
+              <div style={{
+                fontWeight: 700,
+                marginBottom: 8,
+                color: '#222'
+              }}>SITE</div>
+              <div style={{
+                background: '#f7f9fc',
+                borderRadius: 6,
+                padding: 12,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: 'calc(100vh - 100px - 130px)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  flex: 1,
+                  width: '100%'
+                }}>
                   {customerProjects.map((customer: CustomerProject, index: number) => {
                     return (
                       <button
@@ -786,10 +856,35 @@ export default function IssuesPage() {
             </div>
             
             {/* Sub Site 버튼 영역 - 항상 고정 위치 */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100%) / 3)' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>Sub Site</div>
-              <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              maxWidth: 'calc((100%) / 3)'
+            }}>
+              <div style={{
+                fontWeight: 700,
+                marginBottom: 8,
+                color: '#222'
+              }}>Sub Site</div>
+              <div style={{
+                background: '#f7f9fc',
+                borderRadius: 6,
+                padding: 12,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: 'calc(100vh - 100px - 130px)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  flex: 1,
+                  width: '100%'
+                }}>
                   {subProjects.length > 0 ? (
                     subProjects.map((subProject: CustomerProject) => {
                       return (
@@ -825,7 +920,11 @@ export default function IssuesPage() {
                       );
                     })
                   ) : (
-                    <div style={{ color: '#888', fontSize: '0.9rem', padding: '8px 16px' }}>
+                    <div style={{
+                      color: '#888',
+                      fontSize: '0.9rem',
+                      padding: '8px 16px'
+                    }}>
                       SITE를 선택해주세요
                     </div>
                   )}
@@ -834,10 +933,35 @@ export default function IssuesPage() {
             </div>
             
             {/* Product List 버튼 영역 - 항상 고정 위치 */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 'calc((100%) / 3)'  }}>
-              <div style={{ fontWeight: 700, marginBottom: 8, color: '#222' }}>Product List</div>
-              <div style={{ background: '#f7f9fc', borderRadius: 6, padding: 12, flex: 1, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 100px - 130px)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', overflowX: 'hidden', flex: 1, width: '100%' }}>
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              maxWidth: 'calc((100%) / 3)'
+            }}>
+              <div style={{
+                fontWeight: 700,
+                marginBottom: 8,
+                color: '#222'
+              }}>Product List</div>
+              <div style={{
+                background: '#f7f9fc',
+                borderRadius: 6,
+                padding: 12,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: 'calc(100vh - 100px - 130px)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  flex: 1,
+                  width: '100%'
+                }}>
                   {productList.length > 0 ? (
                     productList.map((product: ProductItem) => {
                       return (
@@ -873,7 +997,11 @@ export default function IssuesPage() {
                       );
                     })
                   ) : (
-                    <div style={{ color: '#888', fontSize: '0.9rem', padding: '8px 16px' }}>
+                    <div style={{
+                      color: '#888',
+                      fontSize: '0.9rem',
+                      padding: '8px 16px'
+                    }}>
                       Sub Site를 선택해주세요
                     </div>
                   )}
@@ -884,9 +1012,23 @@ export default function IssuesPage() {
         </div>
 
         {/* 우측 통계/차트 영역 */}
-        <div style={{ flex: 1, background: '#fff', borderRadius: 8, boxShadow: 'var(--color-shadow)', padding: 32, display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}>
+        <div style={{
+          flex: 1,
+          background: '#fff',
+          borderRadius: 8,
+          boxShadow: 'var(--color-shadow)',
+          padding: 32,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+          height: '100%'
+        }}>
           {/* 상단 뷰 선택 버튼 */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            marginBottom: 24
+          }}>
             {VIEW_TABS.map(tab => (
               <button
                 key={tab.key}
@@ -935,152 +1077,145 @@ export default function IssuesPage() {
           </div>
 
           {/* 선택된 뷰에 따른 내용 표시 */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', color: '#888', fontSize: '1.1rem', overflowY: 'auto' }}>
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            color: '#888',
+            fontSize: '1.1rem',
+            overflowY: 'auto'
+          }}>
             {activeView === 'progress' && (
               selectedProducts.length > 0 ? (
                 issueData ? (
-                  <div style={{ width: '100%', minHeight: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                  <div style={{
+                    width: '100%',
+                    minHeight: '100%'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 24,
+                      paddingBottom: 24
+                    }}>
                       {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
                         switch (block.type) {
                           case 'progress_summary':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>진행률 요약</h4>
-                                
-                                {/* 전체 통계와 버튼을 하나의 흰색 칸에 묶기 */}
-                                {block.data.progress_data && block.data.progress_data.length > 0 && (
-                                  <div style={{ 
-                                    background: '#fff',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e9ecef',
-                                    marginBottom: '16px',
-                                    padding: '16px'
-                                  }}>
-                                    {/* 전체 통계 */}
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'center', 
-                                      gap: 24, 
-                                      marginBottom: '16px'
-                                    }}>
-                                      {(() => {
-                                        const totalStats = block.data.progress_data.reduce((acc: any, tracker: any) => {
-                                          acc.total += tracker.total_count;
-                                          acc.completed += tracker.completed_count;
-                                          acc.inProgress += tracker.in_progress_count;
-                                          return acc;
-                                        }, { total: 0, completed: 0, inProgress: 0 });
-                                        
-                                        const overallCompletionRate = totalStats.total > 0 ? 
-                                          Math.round((totalStats.completed / totalStats.total) * 100 * 10) / 10 : 0;
-                                        
-                                        return (
-                                          <>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>전체</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#28313b' }}>{totalStats.total}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>진행 중</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#FF6B6B' }}>{totalStats.inProgress}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4CAF50' }}>{totalStats.completed}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료율</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#2196F3' }}>{overallCompletionRate}%</div>
-                                            </div>
-                                          </>
-                                        );
-                                      })()}
-                                    </div>
-                                    
-                                    {/* 업무 유형별 버튼 */}
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      flexWrap: 'wrap', 
-                                      gap: 8, 
-                                      justifyContent: 'center'
-                                    }}>
-                                      {block.data.progress_data && block.data.progress_data.map((tracker: any, trackerIndex: number) => (
-                                        <button
-                                          key={trackerIndex}
-                                          style={{
-                                            padding: '6px 12px',
-                                            background: selectedProgressType === tracker.tracker_name ? '#1565C0' : ['#28313b', '#b30000', '#a07000', '#008000', '#6a0dad'][trackerIndex % 5],
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: '4px',
-                                            fontSize: '0.8rem',
-                                            fontWeight: 500,
-                                            color: '#fff',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            if (selectedProgressType !== tracker.tracker_name) {
-                                              e.currentTarget.style.opacity = '0.8';
-                                            }
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.opacity = '1';
-                                          }}
-                                          onClick={() => setSelectedProgressType(selectedProgressType === tracker.tracker_name ? null : tracker.tracker_name)}
-                                        >
-                                          {tracker.tracker_name}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                
-                                
-                                {/* 리스트 - 선택된 유형만 표시 */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  {block.data.progress_data && block.data.progress_data
-                                    .filter((tracker: any) => !selectedProgressType || tracker.tracker_name === selectedProgressType)
-                                    .map((tracker: any, trackerIndex: number) => (
-                                      <div key={trackerIndex} style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        alignItems: 'center',
-                                        padding: '12px 16px',
-                                        background: '#fff',
-                                        borderRadius: '6px',
-                                        border: '1px solid #e0e0e0'
+                              <div key={index} style={{
+                                background: '#f8f9fa',
+                                padding: 24,
+                                borderRadius: 12,
+                                border: '1px solid #e9ecef'
+                              }}>
+                                {/* 업무 유형별 버튼 */}
+                                <div style={{ 
+                                  marginTop: '24px',
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
+                                  gap: '12px',
+                                  justifyContent: 'flex-start'
+                                }}>
+                                  {block.data?.progress_data?.map((tracker: any, trackerIndex: number) => (
+                                    <button
+                                      key={trackerIndex}
+                                      style={{
+                                        padding: 'var(--padding-card)',
+                                        background: selectedProgressType === tracker.tracker_name ? 'var(--selected-bg)' : 
+                                                   tracker.completion_rate < 50 ? '#ffebee' :
+                                                   tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8',
+                                        border: selectedProgressType === tracker.tracker_name ? 'var(--selected-border)' : '1px solid var(--border-darker)',
+                                        borderRadius: 'var(--border-radius-card)',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 600,
+                                        color: selectedProgressType === tracker.tracker_name ? 'var(--accent-color)' : 'var(--text-white)',
+                                        cursor: 'pointer',
+                                        transition: 'var(--transition-smooth)',
+                                        minWidth: '120px',
+                                        flex: '1 1 0',
+                                        textAlign: 'center',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px',
+                                        boxShadow: selectedProgressType === tracker.tracker_name ? 'var(--selected-shadow)' : 'var(--shadow-card)'
+                                      }}
+                                      onClick={() => {
+                                        setSelectedProgressType(selectedProgressType === tracker.tracker_name ? null : tracker.tracker_name);
+                                        // 업무 유형별 버튼 클릭 시 selectedProductForMembers 초기화
+                                        setSelectedProductForMembers(null);
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (selectedProgressType !== tracker.tracker_name) {
+                                          e.currentTarget.style.background = 'var(--button-hover-bg)';
+                                          e.currentTarget.style.borderColor = 'var(--button-hover-border)';
+                                          e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                          e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (selectedProgressType !== tracker.tracker_name) {
+                                          const originalBackground = tracker.completion_rate < 50 ? '#ffebee' :
+                                                                     tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8';
+                                          e.currentTarget.style.background = originalBackground;
+                                          e.currentTarget.style.borderColor = 'var(--border-darker)';
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                        }
+                                      }}
+                                    >
+                                      <span>{tracker.tracker_name}</span>
+                                      <span style={{
+                                        fontSize: '0.75rem',
+                                        color: '#6c757d'
                                       }}>
-                                        <span style={{ fontWeight: 600, color: '#222', fontSize: '1rem' }}>
-                                          {tracker.tracker_name}
-                                        </span>
-                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
-                                          <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{tracker.in_progress_count}건</strong></span>
-                                          <span>완료: <strong style={{ color: '#4CAF50' }}>{tracker.completed_count}건</strong></span>
-                                          <span>완료율: <strong style={{ color: '#2196F3' }}>{tracker.completion_rate}%</strong></span>
-                                        </div>
-                                      </div>
-                                    ))}
+                                        <span style={{
+                                          color: '#FF0000'
+                                        }}>진행: {tracker.in_progress_count}</span>{' '}
+                                        <span style={{
+                                          color: '#1b5e20'
+                                        }}>완료: {tracker.completed_count}</span>{' '}
+                                        <span style={{
+                                          color: '#1976d2'
+                                        }}>완료율: {tracker.completion_rate}%</span>
+                                      </span>
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             );
                           case 'progress_detail':
                             return selectedProgressType ? (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>진행률 상세 - {selectedProgressType}</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                              <div key={index} style={{
+                                background: '#f8f9fa',
+                                padding: 24,
+                                borderRadius: 12,
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <h4 style={{
+                                  margin: '0 0 16px 0',
+                                  color: '#222',
+                                  fontSize: '1.2rem'
+                                }}>진행률 상세 - {selectedProgressType}</h4>
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 16
+                                }}>
                                   {block.data.progress_detail && block.data.progress_detail
                                     .filter((tracker: any) => tracker.tracker_name === selectedProgressType)
                                     .map((tracker: any, trackerIndex: number) => (
-                                    <div key={trackerIndex} style={{ 
-                                      background: '#fff',
-                                      borderRadius: '8px',
-                                      border: '1px solid #e9ecef',
-                                      padding: '16px'
-                                    }}>
+                                      <div key={trackerIndex} style={{ 
+                                        background: '#fff',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e9ecef',
+                                        padding: '16px'
+                                      }}>
 
-                                      <div style={{ display: 'flex', gap: 12 }}>
+                                      <div style={{
+                                        display: 'flex',
+                                        gap: 12
+                                      }}>
                                         {tracker.status_details && tracker.status_details.map((status: any, statusIndex: number) => (
                                           <div 
                                             key={statusIndex} 
@@ -1105,10 +1240,12 @@ export default function IssuesPage() {
                                               fontWeight: 600,
                                               textAlign: 'center'
                                             }}>
-                                              <div style={{ marginBottom: '4px' }}>
+                                              <div style={{
+                                                marginBottom: '4px'
+                                              }}>
                                                 {status.status_name}
                                               </div>
-                                              <div style={{ 
+                                              <div style={{
                                                 fontSize: '0.9rem',
                                                 fontWeight: 700,
                                                 color: '#2196F3'
@@ -1119,29 +1256,29 @@ export default function IssuesPage() {
                                             
                                             {/* 드롭 영역 표시 */}
                                             {dragOverStatus === status.status_name && (
-                                              <div style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 0,
-                                                background: 'rgba(33, 150, 243, 0.1)',
-                                                border: '2px dashed #2196F3',
-                                                borderRadius: '6px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                pointerEvents: 'none',
-                                                zIndex: 10
-                                              }}>
-                                                <div style={{
-                                                  background: '#2196F3',
-                                                  color: '#fff',
-                                                  padding: '8px 16px',
-                                                  borderRadius: '4px',
-                                                  fontSize: '0.8rem',
-                                                  fontWeight: 600
+                                                                                              <div style={{
+                                                  position: 'absolute',
+                                                  top: 0,
+                                                  left: 0,
+                                                  right: 0,
+                                                  bottom: 0,
+                                                  background: 'rgba(33, 150, 243, 0.1)',
+                                                  border: '2px dashed #2196F3',
+                                                  borderRadius: '6px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  pointerEvents: 'none',
+                                                  zIndex: 10
                                                 }}>
+                                                  <div style={{
+                                                    background: '#2196F3',
+                                                    color: '#fff',
+                                                    padding: '8px 16px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 600
+                                                  }}>
                                                   여기에 드롭하세요
                                                 </div>
                                               </div>
@@ -1169,13 +1306,24 @@ export default function IssuesPage() {
                                                     boxShadow: isDragging && draggedIssue?.redmine_id === issue.redmine_id ? '0 4px 8px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.1)'
                                                   }}
                                                 >
-                                                  <div style={{ marginBottom: '4px', fontWeight: 600, color: '#2196F3' }}>
+                                                  <div style={{
+                                                    marginBottom: '4px',
+                                                    fontWeight: 600,
+                                                    color: '#2196F3'
+                                                  }}>
                                                     #{issue.redmine_id}
                                                   </div>
-                                                  <div style={{ marginBottom: '4px', fontSize: '0.7rem', color: '#666', fontStyle: 'italic' }}>
+                                                  <div style={{
+                                                    marginBottom: '4px',
+                                                    fontSize: '0.7rem',
+                                                    color: '#666',
+                                                    fontStyle: 'italic'
+                                                  }}>
                                                     작성자: {issue.author_name || '미지정'}
                                                   </div>
-                                                  <div style={{ color: '#333' }}>
+                                                  <div style={{
+                                                    color: '#333'
+                                                  }}>
                                                     {issue.subject}
                                                   </div>
                                                 </div>
@@ -1201,128 +1349,293 @@ export default function IssuesPage() {
             {activeView === 'summary' && (
               selectedProducts.length > 0 ? (
                 issueData ? (
-                  <div style={{ width: '100%', minHeight: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                  <div style={{
+                    width: '100%',
+                    minHeight: '100%'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 24,
+                      paddingBottom: 24
+                    }}>
                       {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
                         switch (block.type) {
                           case 'progress_summary':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>진행률 요약</h4>
-                                
-                                {/* 전체 통계와 버튼을 하나의 흰색 칸에 묶기 */}
-                                {block.data.progress_data && block.data.progress_data.length > 0 && (
-                                  <div style={{ 
-                                    background: '#fff',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e9ecef',
-                                    marginBottom: '16px',
-                                    padding: '16px'
+                              <div key={index} style={{
+                                background: '#f8f9fa',
+                                padding: 24,
+                                borderRadius: 12,
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <div style={{
+                                  display: 'flex',
+                                  gap: '12px'
+                                }}>
+                                  {/* 전체 카드 */}
+                                  <div style={{
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: '#1a1a1a',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    {/* 전체 통계 */}
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'center', 
-                                      gap: 24, 
-                                      marginBottom: '16px'
+                                    <span style={{
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      전체
+                                    </span>
+                                    
+                                    <span style={{
+                                      fontSize: '3.5rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.total_count || 0), 0) || 0}
+                                    </span>
+                                    
+
+                                  </div>
+
+                                  {/* 진행 중 카드 */}
+                                  <div style={{
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: '#FFC107',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      진행 중
+                                    </span>
+                                    
+                                    <span style={{
+                                      fontSize: '3.5rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.in_progress_count || 0), 0) || 0}
+                                    </span>
+                                    
+
+                                  </div>
+
+                                  {/* 완료 카드 */}
+                                  <div style={{
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: '#1b5e20',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      완료
+                                    </span>
+                                    
+                                    <span style={{
+                                      fontSize: '3.5rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.completed_count || 0), 0) || 0}
+                                    </span>
+                                    
+
+                                  </div>
+
+                                  {/* 완료율 카드 */}
+                                  <div style={{
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: (() => {
+                                      const totalCompleted = block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.completed_count || 0), 0) || 0;
+                                      const totalCount = block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.total_count || 0), 0) || 0;
+                                      const completionRate = totalCount > 0 ? (totalCompleted / totalCount * 100) : 0;
+                                      return completionRate <= 50 ? '#FF0000' : completionRate <= 80 ? '#FFC107' : '#1b5e20';
+                                    })(),
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      완료율
+                                    </span>
+                                    
+                                    <span style={{
+                                      fontSize: '3.5rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
                                     }}>
                                       {(() => {
-                                        const totalStats = block.data.progress_data.reduce((acc: any, tracker: any) => {
-                                          acc.total += tracker.total_count;
-                                          acc.completed += tracker.completed_count;
-                                          acc.inProgress += tracker.in_progress_count;
-                                          return acc;
-                                        }, { total: 0, completed: 0, inProgress: 0 });
-                                        
-                                        const overallCompletionRate = totalStats.total > 0 ? 
-                                          Math.round((totalStats.completed / totalStats.total) * 100 * 10) / 10 : 0;
-                                        
-                                        return (
-                                          <>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>전체</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#28313b' }}>{totalStats.total}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>진행 중</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#FF6B6B' }}>{totalStats.inProgress}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4CAF50' }}>{totalStats.completed}건</div>
-                                            </div>
-                                            <div style={{ textAlign: 'center' }}>
-                                              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '4px' }}>완료율</div>
-                                              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#2196F3' }}>{overallCompletionRate}%</div>
-                                            </div>
-                                          </>
-                                        );
-                                      })()}
-                                    </div>
+                                        const totalCompleted = block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.completed_count || 0), 0) || 0;
+                                        const totalCount = block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.total_count || 0), 0) || 0;
+                                        const completionRate = totalCount > 0 ? (totalCompleted / totalCount * 100) : 0;
+                                        return Math.round(completionRate * 10) / 10;
+                                      })()}%
+                                    </span>
                                     
-                                    {/* 업무 유형별 버튼 */}
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      flexWrap: 'wrap', 
-                                      gap: 8, 
-                                      justifyContent: 'center'
-                                    }}>
-                                      {block.data.progress_data && block.data.progress_data.map((tracker: any, trackerIndex: number) => (
-                                        <button
-                                          key={trackerIndex}
-                                          style={{
-                                            padding: '6px 12px',
-                                            background: selectedProgressType === tracker.tracker_name ? '#1565C0' : ['#28313b', '#b30000', '#a07000', '#008000', '#6a0dad'][trackerIndex % 5],
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: '4px',
-                                            fontSize: '0.8rem',
-                                            fontWeight: 500,
-                                            color: '#fff',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            if (selectedProgressType !== tracker.tracker_name) {
-                                              e.currentTarget.style.opacity = '0.8';
-                                            }
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.opacity = '1';
-                                          }}
-                                          onClick={() => setSelectedProgressType(selectedProgressType === tracker.tracker_name ? null : tracker.tracker_name)}
-                                        >
-                                          {tracker.tracker_name}
-                                        </button>
-                                      ))}
-                                    </div>
+
                                   </div>
-                                )}
+                                </div>
                                 
-                                
-                                {/* 리스트 - 선택된 유형만 표시 */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  {block.data.progress_data && block.data.progress_data
-                                    .filter((tracker: any) => !selectedProgressType || tracker.tracker_name === selectedProgressType)
-                                    .map((tracker: any, trackerIndex: number) => (
-                                      <div key={trackerIndex} style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        alignItems: 'center',
-                                        padding: '12px 16px',
-                                        background: '#fff',
-                                        borderRadius: '6px',
-                                        border: '1px solid #e0e0e0'
+                                {/* 업무 유형별 버튼 */}
+                                <div style={{ 
+                                  marginTop: '24px',
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
+                                  gap: '12px',
+                                  justifyContent: 'flex-start'
+                                }}>
+                                  {block.data?.progress_data?.map((tracker: any, trackerIndex: number) => (
+                                    <button
+                                      key={trackerIndex}
+                                      style={{
+                                        padding: 'var(--padding-card)',
+                                        background: selectedProgressType === tracker.tracker_name ? 'var(--selected-bg)' : 
+                                                   tracker.completion_rate < 50 ? '#ffebee' :
+                                                   tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8',
+                                        border: selectedProgressType === tracker.tracker_name ? 'var(--selected-border)' : '1px solid var(--border-darker)',
+                                        borderRadius: 'var(--border-radius-card)',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 600,
+                                        color: selectedProgressType === tracker.tracker_name ? 'var(--accent-color)' : 'var(--text-white)',
+                                        cursor: 'pointer',
+                                        transition: 'var(--transition-smooth)',
+                                        minWidth: '120px',
+                                        flex: '1 1 0',
+                                        textAlign: 'center',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px',
+                                        boxShadow: selectedProgressType === tracker.tracker_name ? 'var(--selected-shadow)' : 'var(--shadow-card)'
+                                      }}
+                                      onClick={() => {
+                                        setSelectedProgressType(selectedProgressType === tracker.tracker_name ? null : tracker.tracker_name);
+                                        // 업무 유형별 버튼 클릭 시 selectedProductForMembers 초기화
+                                        setSelectedProductForMembers(null);
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (selectedProgressType !== tracker.tracker_name) {
+                                          e.currentTarget.style.background = 'var(--button-hover-bg)';
+                                          e.currentTarget.style.borderColor = 'var(--button-hover-border)';
+                                          e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                          e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (selectedProgressType !== tracker.tracker_name) {
+                                          const originalBackground = tracker.completion_rate < 50 ? '#ffebee' :
+                                                                     tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8';
+                                          e.currentTarget.style.background = originalBackground;
+                                          e.currentTarget.style.borderColor = 'var(--border-darker)';
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                        }
+                                      }}
+                                    >
+                                      <span>{tracker.tracker_name}</span>
+                                      <span style={{
+                                        fontSize: '0.75rem',
+                                        color: '#6c757d'
                                       }}>
-                                        <span style={{ fontWeight: 600, color: '#222', fontSize: '1rem' }}>
-                                          {tracker.tracker_name}
-                                        </span>
-                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
-                                          <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{tracker.in_progress_count}건</strong></span>
-                                          <span>완료: <strong style={{ color: '#4CAF50' }}>{tracker.completed_count}건</strong></span>
-                                          <span>완료율: <strong style={{ color: '#2196F3' }}>{tracker.completion_rate}%</strong></span>
-                                        </div>
-                                      </div>
-                                    ))}
+                                        <span style={{
+                                          color: '#FF0000'
+                                        }}>진행: {tracker.in_progress_count}</span>{' '}
+                                        <span style={{
+                                          color: '#1b5e20'
+                                        }}>완료: {tracker.completed_count}</span>{' '}
+                                        <span style={{
+                                          color: '#1976d2'
+                                        }}>완료율: {tracker.completion_rate}%</span>
+                                      </span>
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -1332,24 +1645,24 @@ export default function IssuesPage() {
                               return null;
                             }
                             return (
-                              <div key={index} style={{ 
-                                background: 'var(--dark-bg)', 
-                                padding: 'var(--padding-panel)', 
-                                borderRadius: 'var(--border-radius-panel)',
-                                border: `1px solid var(--border-dark)`,
-                                boxShadow: 'var(--shadow-dark)'
+                              <div key={index} style={{
+                                background: '#f8f9fa',
+                                padding: 24,
+                                borderRadius: 12,
+                                border: '1px solid #e9ecef'
                               }}>
-                                <h4 style={{ 
-                                  margin: '0 0 16px 0', 
-                                  color: 'var(--text-white)', 
-                                  fontSize: '1.2rem',
-                                  fontWeight: 700
+     
+                                <div style={{
+                                  display: 'flex',
+                                  gap: 20
                                 }}>
-                                  유형별 상세 현황 - {selectedProgressType}
-                                </h4>
-                                <div style={{ display: 'flex', gap: 20 }}>
                                   {/* 왼쪽: 설비군별 현황 */}
-                                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                  <div style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 12
+                                  }}>
                                     {block.data.type_list && block.data.type_list.length > 0 ? (
                                       (() => {
                                         // selectedProgressType이 있으면 해당 유형만 필터링, 없으면 전체 표시
@@ -1362,10 +1675,10 @@ export default function IssuesPage() {
                                             <div style={{ 
                                               textAlign: 'center', 
                                               padding: '40px 20px', 
-                                              color: 'var(--text-white)',
-                                              background: 'var(--dark-card-bg)',
-                                              borderRadius: 'var(--border-radius-card)',
-                                              border: `1px solid var(--border-darker)`
+                                              color: '#333',
+                                              background: '#f8f9fa',
+                                              borderRadius: '8px',
+                                              border: '1px solid #e9ecef'
                                             }}>
                                               {selectedProgressType ? `${selectedProgressType}의 상세 데이터가 없습니다.` : '상세 데이터가 없습니다.'}
                                             </div>
@@ -1377,22 +1690,22 @@ export default function IssuesPage() {
                                             display: 'flex', 
                                             justifyContent: 'space-between', 
                                             alignItems: 'flex-start',
-                                            padding: 'var(--padding-card)',
-                                            background: 'var(--dark-card-bg)',
-                                            borderRadius: 'var(--border-radius-card)',
-                                            border: `1px solid var(--border-darker)`,
-                                            boxShadow: 'var(--shadow-card)',
+                                            padding: '16px',
+                                            background: '#fff',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e0e0e0',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                             gap: '20px',
                                             width: '100%',
                                             boxSizing: 'border-box',
                                             overflow: 'hidden',
-                                            transition: 'var(--transition-smooth)'
+                                            transition: 'all 0.2s ease'
                                           }}>
                                             {/* 유형 이름 */}
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                                               <span style={{ 
                                                 fontWeight: 700, 
-                                                color: 'var(--text-white)', 
+                                                color: '#333', 
                                                 fontSize: '1.1rem' 
                                               }}>
                                                 {typeItem.tracker_name}
@@ -1402,79 +1715,83 @@ export default function IssuesPage() {
                                               <div style={{ 
                                                 display: 'flex', 
                                                 gap: 16, 
-                                                fontSize: '0.9rem', 
-                                                color: 'var(--text-white)', 
+                                                fontSize: '1rem', 
+                                                color: '#333', 
                                                 alignItems: 'center', 
                                                 marginBottom: '16px' 
                                               }}>
-                                                <span>전체: <strong style={{ color: 'var(--text-white)' }}>{typeItem.total_count}건</strong></span>
+                                                <span>전체: <strong style={{ color: '#333' }}>{typeItem.total_count}건</strong></span>
                                                 <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{typeItem.in_progress_count}건</strong></span>
                                                 <span>완료: <strong style={{ color: '#4CAF50' }}>{typeItem.completed_count}건</strong></span>
-                                                <span>완료율: <strong style={{ color: 'var(--accent-color)' }}>{typeItem.completion_rate}%</strong></span>
+                                                <span>완료율: <strong style={{ color: '#1976d2' }}>{typeItem.completion_rate}%</strong></span>
                                               </div>
                                               
                                               {/* Product 상세 정보 */}
                                               {typeItem.product_details && typeItem.product_details.length > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                   <span style={{ 
-                                                    fontSize: '0.85rem', 
+                                                    fontSize: '1rem', 
                                                     color: 'var(--accent-color)', 
                                                     fontWeight: 600 
                                                   }}>
-                                                    설비군별 현황:
+                                                    설비군별 현황
                                                   </span>
                                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                     {typeItem.product_details.map((product: any, productIndex: number) => (
-                                                                                                              <div 
-                                                          key={productIndex} 
-                                                          style={{ 
-                                                            padding: 'var(--padding-card)',
-                                                            background: selectedProductForMembers === product.product_name ? 'var(--selected-bg)' : 'var(--dark-card-bg)',
-                                                            borderRadius: 'var(--border-radius-card)',
-                                                            border: selectedProductForMembers === product.product_name ? 'var(--selected-border)' : `1px solid var(--border-darker)`,
+                                                      <div 
+                                                        key={productIndex} 
+                                                        style={{
+                                                            padding: '12px',
+                                                            background: selectedProductForMembers === product.product_name ? '#e3f2fd' : '#f8f9fa',
+                                                            borderRadius: '6px',
+                                                            border: selectedProductForMembers === product.product_name ? '1px solid #2196f3' : '1px solid #e9ecef',
                                                             width: '100%',
                                                             boxSizing: 'border-box',
                                                             wordBreak: 'break-word',
                                                             cursor: 'pointer',
-                                                            transition: 'var(--transition-smooth)',
-                                                            boxShadow: selectedProductForMembers === product.product_name ? 'var(--selected-shadow)' : 'var(--shadow-card)'
+                                                            transition: 'all 0.2s ease',
+                                                            boxShadow: selectedProductForMembers === product.product_name ? '0 2px 8px rgba(33, 150, 243, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)'
                                                           }}
-                                                          onClick={() => setSelectedProductForMembers(selectedProductForMembers === product.product_name ? null : product.product_name)}
+                                                          onClick={() => {
+                                                            setSelectedProductForMembers(selectedProductForMembers === product.product_name ? null : product.product_name);
+                                                            // 설비군별 현황 클릭 시 selectedMembers 초기화
+                                                            setSelectedMembers([]);
+                                                          }}
                                                           onMouseEnter={(e) => {
                                                             if (selectedProductForMembers !== product.product_name) {
-                                                              e.currentTarget.style.background = 'var(--button-hover-bg)';
-                                                              e.currentTarget.style.borderColor = 'var(--button-hover-border)';
-                                                              e.currentTarget.style.transform = 'var(--card-hover-transform)';
-                                                              e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                                              e.currentTarget.style.background = '#f5f5f5';
+                                                              e.currentTarget.style.borderColor = '#2196f3';
+                                                              e.currentTarget.style.transform = 'translateY(-2px)';
+                                                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
                                                             }
                                                           }}
                                                           onMouseLeave={(e) => {
                                                             if (selectedProductForMembers !== product.product_name) {
-                                                              e.currentTarget.style.background = 'var(--dark-card-bg)';
-                                                              e.currentTarget.style.borderColor = 'var(--border-darker)';
+                                                              e.currentTarget.style.background = '#f8f9fa';
+                                                              e.currentTarget.style.borderColor = '#e9ecef';
                                                               e.currentTarget.style.transform = 'translateY(0)';
-                                                              e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                                              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
                                                             }
                                                           }}
                                                       >
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                                           <span style={{ 
-                                                            fontSize: '0.85rem', 
-                                                            color: 'var(--text-white)',
+                                                            fontSize: '1rem', 
+                                                            color: '#495057',
                                                             fontWeight: 600
                                                           }}>
                                                             {product.product_name}
                                                           </span>
                                                           <span style={{ 
-                                                            fontSize: '0.75rem', 
+                                                            fontSize: '1rem', 
                                                             color: product.completion_rate < 50 ? '#dc3545' : 
-                                                                   product.completion_rate < 80 ? '#ffc107' : '#28a745',
+                                                                   product.completion_rate < 80 ? '#ff8c00' : '#28a745',
                                                             fontWeight: 600
                                                           }}>
                                                             {product.completion_rate}%
                                                           </span>
                                                         </div>
-                                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.8rem', color: '#666' }}>
+                                                        <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: '#666' }}>
                                                           <span>전체: <strong>{product.total_count}건</strong></span>
                                                           <span>진행 중: <strong style={{ color: '#FF6B6B' }}>{product.in_progress_count}건</strong></span>
                                                           <span>완료: <strong style={{ color: '#4CAF50' }}>{product.completed_count}건</strong></span>
@@ -1505,14 +1822,6 @@ export default function IssuesPage() {
                                   {/* 우측: 선택된 설비의 인원별 현황 */}
                                    {selectedProductForMembers && (
                                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                        <h5 style={{ 
-                                          margin: '0 0 0px 0', 
-                                          color: 'var(--text-white)', 
-                                          fontSize: '1rem',
-                                          fontWeight: 600
-                                        }}>
-                                         {selectedProductForMembers} 작업 인원
-                                       </h5>
                                        {(() => {
                                          // 선택된 설비의 인원 정보 찾기
                                          const selectedProductData = block.data.type_list
@@ -1537,144 +1846,110 @@ export default function IssuesPage() {
                                          
                                          return (
                                            <div style={{ 
-                                             display: 'flex', 
-                                             flexWrap: 'wrap', 
-                                             gap: 20,
-                                             padding: 'var(--padding-panel)',
-                                             background: 'var(--dark-card-bg)',
-                                             borderRadius: 'var(--border-radius-card)',
-                                             border: `1px solid var(--border-darker)`,
-                                             boxShadow: 'var(--shadow-card)'
+                                             marginTop: '4px',
+                                             padding: '16px',
+                                             background: '#fff',
+                                             borderRadius: '8px',
+                                             border: '1px solid #e0e0e0'
                                            }}>
-                                             {selectedProductData.member_details.map((member: any, memberIndex: number) => (
-                                               <div 
-                                                 key={memberIndex} 
-                                                 style={{ 
-                                                   display: 'flex',
-                                                   alignItems: 'center',
-                                                   padding: 'var(--padding-card)',
-                                                   background: selectedMembers.includes(member.member_name) ? 'var(--selected-bg)' : 'var(--dark-card-bg)',
-                                                   borderRadius: 'var(--border-radius-card)',
-                                                   border: selectedMembers.includes(member.member_name) ? 'var(--selected-border)' : `1px solid var(--border-darker)`,
-                                                   minWidth: 'fit-content',
-                                                   cursor: 'pointer',
-                                                   transition: 'var(--transition-smooth)',
-                                                   position: 'relative',
-                                                   boxShadow: selectedMembers.includes(member.member_name) ? 'var(--selected-shadow)' : 'var(--shadow-card)'
-                                                 }}
-                                                 onClick={(e) => {
-                                                   const isCtrlPressed = e.ctrlKey || e.metaKey;
-                                                   if (isCtrlPressed) {
-                                                     // Ctrl 키가 눌린 경우: 다중 선택
-                                                     setSelectedMembers(prev => {
-                                                       if (prev.includes(member.member_name)) {
-                                                         return prev.filter(name => name !== member.member_name);
-                                                       } else {
-                                                         return [...prev, member.member_name];
-                                                       }
-                                                     });
-                                                   } else {
-                                                     // Ctrl 키가 안 눌린 경우: 토글 선택 (이미 선택된 경우 해제)
-                                                     setSelectedMembers(prev => {
-                                                       if (prev.includes(member.member_name)) {
-                                                         return prev.filter(name => name !== member.member_name);
-                                                       } else {
-                                                         return [member.member_name];
-                                                       }
-                                                     });
-                                                   }
-                                                 }}
-                                                 onMouseEnter={(e) => {
-                                                   // 호버 툴팁 표시
-                                                   const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                                   if (tooltip) {
-                                                     tooltip.style.display = 'block';
-                                                   }
-                                                   
-                                                   // 호버 효과 추가
-                                                   if (!selectedMembers.includes(member.member_name)) {
-                                                     e.currentTarget.style.background = 'var(--button-hover-bg)';
-                                                     e.currentTarget.style.borderColor = 'var(--button-hover-border)';
-                                                     e.currentTarget.style.transform = 'var(--card-hover-transform)';
-                                                     e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
-                                                   }
-                                                 }}
-                                                 onMouseLeave={(e) => {
-                                                   // 호버 툴팁 숨김
-                                                   const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                                   if (tooltip) {
-                                                     tooltip.style.display = 'none';
-                                                   }
-                                                   
-                                                   // 호버 효과 제거
-                                                   if (!selectedMembers.includes(member.member_name)) {
-                                                     e.currentTarget.style.background = 'var(--dark-card-bg)';
-                                                     e.currentTarget.style.borderColor = 'var(--border-darker)';
-                                                     e.currentTarget.style.transform = 'translateY(0)';
-                                                     e.currentTarget.style.boxShadow = 'var(--shadow-card)';
-                                                   }
-                                                 }}
-                                               >
-                                                 {/* 완료율 표시 점 */}
-                                                 <div style={{
-                                                   width: '8px',
-                                                   height: '8px',
-                                                   borderRadius: '50%',
-                                                   backgroundColor: member.completion_rate >= 80 ? '#28a745' : 
-                                                                  member.completion_rate >= 50 ? '#ffc107' : '#dc3545',
-                                                   marginRight: '8px',
-                                                   flexShrink: 0
-                                                 }} />
-                                                 <span style={{ 
-                                                   fontSize: '0.9rem', 
-                                                   fontWeight: 600, 
-                                                   color: '#28313b',
-                                                   whiteSpace: 'nowrap'
-                                                 }}>
-                                                   {member.member_name}
-                                                 </span>
-                                                 
-                                                 {/* 호버 툴팁 */}
+                                             <h5 style={{ 
+                                               margin: '0 0 12px 0', 
+                                               color: 'var(--accent-color)', 
+                                               fontSize: '1rem',
+                                               fontWeight: 600
+                                             }}>
+                                              {selectedProductForMembers} 작업 인원
+                                            </h5>
+                                             <div style={{
+                                               display: 'flex',
+                                               flexDirection: 'row',
+                                               flexWrap: 'wrap',
+                                               gap: '8px'
+                                             }}>
+                                               {selectedProductData.member_details.map((member: any, memberIndex: number) => (
                                                  <div 
-                                                   className="tooltip"
-                                                   style={{
-                                                     position: 'absolute',
-                                                     top: '100%',
-                                                     left: '0',
-                                                     background: '#333',
-                                                     color: '#fff',
-                                                     padding: '8px 12px',
+                                                   key={memberIndex} 
+                                                   style={{ 
+                                                     padding: '8px 10px',
+                                                     background: selectedMembers.includes(member.member_name) ? '#e3f2fd' : '#f8f9fa',
                                                      borderRadius: '4px',
-                                                     fontSize: '0.8rem',
-                                                     whiteSpace: 'nowrap',
-                                                     zIndex: 1000,
-                                                     display: 'none',
-                                                     boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                                                     border: selectedMembers.includes(member.member_name) ? '1px solid #2196f3' : '1px solid #e9ecef',
+                                                     fontSize: '0.85rem',
+                                                     color: '#333',
+                                                     lineHeight: '1.4',
+                                                     display: 'flex',
+                                                     alignItems: 'center',
+                                                     gap: '8px',
+                                                     cursor: 'pointer',
+                                                     transition: 'all 0.2s ease'
+                                                   }}
+                                                   onClick={(e) => {
+                                                     const isCtrlPressed = e.ctrlKey || e.metaKey;
+                                                     if (isCtrlPressed) {
+                                                       // Ctrl 키가 눌린 경우: 다중 선택
+                                                       setSelectedMembers(prev => {
+                                                         if (prev.includes(member.member_name)) {
+                                                           return prev.filter(name => name !== member.member_name);
+                                                         } else {
+                                                           return [...prev, member.member_name];
+                                                         }
+                                                       });
+                                                     } else {
+                                                       // Ctrl 키가 안 눌린 경우: 토글 선택 (이미 선택된 경우 해제)
+                                                       setSelectedMembers(prev => {
+                                                         if (prev.includes(member.member_name)) {
+                                                           return prev.filter(name => name !== member.member_name);
+                                                         } else {
+                                                           return [member.member_name];
+                                                         }
+                                                       });
+                                                     }
+                                                   }}
+                                                   onMouseEnter={(e) => {
+                                                     // 호버 효과 추가
+                                                     if (!selectedMembers.includes(member.member_name)) {
+                                                       e.currentTarget.style.background = '#e9ecef';
+                                                       e.currentTarget.style.transform = 'translateY(-1px)';
+                                                       e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                                                     }
+                                                   }}
+                                                   onMouseLeave={(e) => {
+                                                     // 호버 효과 제거
+                                                     if (!selectedMembers.includes(member.member_name)) {
+                                                       e.currentTarget.style.background = '#f8f9fa';
+                                                       e.currentTarget.style.transform = 'translateY(0)';
+                                                       e.currentTarget.style.boxShadow = 'none';
+                                                     }
                                                    }}
                                                  >
-                                                   <div style={{ marginBottom: '4px' }}>
-                                                     완료율: <strong style={{ color: member.completion_rate < 50 ? '#ff6b6b' : 
-                                                                           member.completion_rate < 80 ? '#ffd93d' : '#6bcf7f' }}>
-                                                       {member.completion_rate}%
-                                                     </strong>
-                                                   </div>
-                                                   <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
-                                                     <span>전체: <strong>{member.total_count}건</strong></span>
-                                                     <span>진행 중: <strong style={{ color: '#ff6b6b' }}>{member.in_progress_count}건</strong></span>
-                                                     <span>완료: <strong style={{ color: '#6bcf7f' }}>{member.completed_count}건</strong></span>
-                                                   </div>
+                                                   {/* 완료율 표시 점 */}
+                                                   <div style={{
+                                                     width: '8px',
+                                                     height: '8px',
+                                                     borderRadius: '50%',
+                                                     backgroundColor: member.completion_rate >= 80 ? '#28a745' : 
+                                                                    member.completion_rate >= 50 ? '#ffc107' : '#dc3545',
+                                                     flexShrink: 0
+                                                   }} />
+                                                   <span style={{ 
+                                                     fontSize: '0.85rem', 
+                                                     fontWeight: 600, 
+                                                     color: '#333',
+                                                     flex: 1
+                                                   }}>
+                                                     {member.member_name}
+                                                   </span>
                                                  </div>
-                                               </div>
-                                             ))}
+                                               ))}
+                                             </div>
                                            </div>
                                          );
                                        })()}
-                                       <h5 style={{ margin: '30px 0 0px 0', color: '#222', fontSize: '1rem' }}>
-                                         {selectedProductForMembers} 작업 목록 
-                                       </h5>
-                                       
                                        {/* 일감 목록 */}
-                                       {(() => {
+                                       {(
+                                        
+                                        
+                                        () => {
                                          // 선택된 설비의 일감 정보 찾기
                                          const selectedProductDataForIssues = block.data.type_list
                                            .filter((typeItem: any) => typeItem.tracker_name === selectedProgressType)
@@ -1700,21 +1975,29 @@ export default function IssuesPage() {
                                              filteredIssues = selectedProductDataForIssues.issue_titles.map((title: string, index: number) => ({
                                                subject: title,
                                                redmine_id: selectedProductDataForIssues.issue_numbers[index],
-                                               is_closed: selectedProductDataForIssues.issue_closed_status[index]
+                                               is_closed: selectedProductDataForIssues.issue_closed_status[index],
+                                               description: selectedProductDataForIssues.issue_descriptions ? selectedProductDataForIssues.issue_descriptions[index] || '' : ''
                                              }));
                                            }
                                            
                                            return (
-                                             <div style={{ 
+                                             <div style={{
                                                marginTop: '4px',
                                                padding: '16px',
                                                background: '#fff',
                                                borderRadius: '8px',
                                                border: '1px solid #e0e0e0'
                                              }}>
-                                               <div style={{ 
-                                                 display: 'flex', 
-                                                 flexDirection: 'column', 
+                                               <h5 style={{
+                                                 margin: '0 0 12px 0',
+                                                 color: 'var(--accent-color)',
+                                                 fontSize: '1rem'
+                                               }}>
+                                                 {selectedProductForMembers} 작업 목록 
+                                               </h5>
+                                               <div style={{
+                                                 display: 'flex',
+                                                 flexDirection: 'column',
                                                  gap: '6px'
                                                }}>
                                                  {filteredIssues.map((issue: any, index: number) => (
@@ -1730,26 +2013,53 @@ export default function IssuesPage() {
                                                        lineHeight: '1.4',
                                                        display: 'flex',
                                                        alignItems: 'center',
-                                                       gap: '8px'
+                                                       gap: '8px',
+                                                       cursor: 'pointer',
+                                                       transition: 'all 0.2s ease'
+                                                     }}
+                                                     onClick={() => handleModalOpen(issue)}
+                                                     onMouseEnter={(e) => {
+                                                       e.currentTarget.style.background = '#e9ecef';
+                                                       e.currentTarget.style.transform = 'translateY(-1px)';
+                                                       e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                                                     }}
+                                                     onMouseLeave={(e) => {
+                                                       e.currentTarget.style.background = '#f8f9fa';
+                                                       e.currentTarget.style.transform = 'translateY(0)';
+                                                       e.currentTarget.style.boxShadow = 'none';
                                                      }}
                                                    >
-                                                     <button 
-                                                       onClick={() => window.open(`https://pms.ati2000.co.kr/issues/${issue.redmine_id}`, '_blank')}
-                                                       style={{
-                                                         padding: '2px 6px',
-                                                         background: issue.is_closed === 1 ? '#28a745' : '#dc3545',
-                                                         border: '1px solid #dee2e6',
-                                                         borderRadius: '3px',
-                                                         fontSize: '0.7rem',
-                                                         color: '#fff',
+                                                     <span 
+                                                       style={{ 
+                                                         fontSize: '0.85rem', 
+                                                         color: '#ffffff', 
+                                                         fontWeight: 700,
+                                                         background: issue.is_closed === 1 ? 'var(--success-color)' : 'var(--danger-color)', 
+                                                         padding: '6px 10px',
+                                                         borderRadius: 6,
+                                                         minWidth: 'fit-content',
                                                          cursor: 'pointer',
-                                                         flexShrink: 0,
-                                                         minWidth: '40px'
+                                                         transition: 'all 0.2s ease',
+                                                         boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                                       }}
+                                                       onClick={(e) => {
+                                                         e.stopPropagation();
+                                                         window.open(`https://pms.ati2000.co.kr/issues/${issue.redmine_id}`, '_blank');
+                                                       }}
+                                                       onMouseEnter={(e) => {
+                                                         e.currentTarget.style.transform = 'var(--hover-scale)';
+                                                         e.currentTarget.style.boxShadow = 'var(--shadow-hover)';
+                                                       }}
+                                                       onMouseLeave={(e) => {
+                                                         e.currentTarget.style.transform = 'scale(1)';
+                                                         e.currentTarget.style.boxShadow = 'var(--shadow-card)';
                                                        }}
                                                      >
                                                        #{issue.redmine_id}
-                                                     </button>
-                                                     {issue.subject}
+                                                     </span>
+                                                     <span style={{
+                                                       flex: 1
+                                                     }}>{issue.subject}</span>
                                                    </div>
                                                  ))}
                                                </div>
@@ -1775,15 +2085,31 @@ export default function IssuesPage() {
             {false && activeView === 'type' && (
               selectedProducts.length > 0 ? (
                 issueData ? (
-                  <div style={{ width: '100%', minHeight: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                  <div style={{
+                    width: '100%',
+                    minHeight: '100%'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 24,
+                      paddingBottom: 24
+                    }}>
                       {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
                         switch (block.type) {
                           case 'type_data':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 16, borderRadius: 8 }}>
-                                <h4 style={{ margin: '0 0 12px 0', color: '#222', fontSize: '1.2rem' }}>유형별 통계</h4>
-                                <div style={{ 
+                              <div key={index} style={{
+                                background: '#f7f9fc',
+                                padding: 16,
+                                borderRadius: 8
+                              }}>
+                                <h4 style={{
+                                  margin: '0 0 12px 0',
+                                  color: '#222',
+                                  fontSize: '1.2rem'
+                                }}>유형별 통계</h4>
+                                <div style={{
                                   padding: '12px 20px',
                                   background: '#fff',
                                   borderRadius: 8,
@@ -2134,7 +2460,7 @@ export default function IssuesPage() {
                         switch (block.type) {
                           case 'best_member_summary':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8, width: '90%' }}>
+                              <div key={index} style={{ background: '#f8f9fa', padding: 24, borderRadius: 12, border: '1px solid #e9ecef', width: '90%' }}>
                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>BEST 작업자</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                   {block.data && block.data.length > 0 ? (
@@ -2355,11 +2681,12 @@ export default function IssuesPage() {
                                               borderRadius: '8px',
                                               fontSize: '0.85rem',
                                               whiteSpace: 'nowrap',
-                                              zIndex: 1000,
+                                              zIndex: 9999,
                                               display: 'none',
                                               boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                                               border: '1px solid #000',
-                                              marginTop: '8px'
+                                              marginTop: '8px',
+                                              pointerEvents: 'none'
                                             }}>
                                               <div style={{ fontWeight: 600, marginBottom: '8px', color: '#FF6B6B' }}>진행 중 작업 유형:</div>
                                               <div dangerouslySetInnerHTML={{ __html: member.in_progress_types }} />
@@ -2404,11 +2731,12 @@ export default function IssuesPage() {
                                               borderRadius: '8px',
                                               fontSize: '0.85rem',
                                               whiteSpace: 'nowrap',
-                                              zIndex: 1000,
+                                              zIndex: 9999,
                                               display: 'none',
                                               boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                                               border: '1px solid #000',
-                                              marginTop: '8px'
+                                              marginTop: '8px',
+                                              pointerEvents: 'none'
                                             }}>
                                               <div style={{ fontWeight: 600, marginBottom: '8px', color: '#4CAF50' }}>완료 작업 유형:</div>
                                               <div dangerouslySetInnerHTML={{ __html: member.completed_types }} />
@@ -2463,13 +2791,13 @@ export default function IssuesPage() {
                         switch (block.type) {
                           case 'hw_overview':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                              <div key={index} style={{ background: '#f8f9fa', padding: 24, borderRadius: 12, border: '1px solid #e9ecef' }}>
                                 <div style={{ display: 'flex', gap: 16 }}>
                                   <div style={{ 
                                     flex: 1,
                                     minWidth: '200px',
                                     padding: '24px',
-                                    background: '#1a1a1a',
+                                    background: '#282c34',
                                     borderRadius: '16px',
                                     border: 'none',
                                     boxShadow: 'none',
@@ -2482,17 +2810,7 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    {/* 배경 장식 요소 */}
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '-50%',
-                                      right: '-50%',
-                                      width: '200%',
-                                      height: '200%',
-                                      background: 'rgba(255,255,255,0.1)',
-                                      transform: 'rotate(45deg)',
-                                      pointerEvents: 'none'
-                                    }}></div>
+
                                     
                                     <span style={{ 
                                       position: 'absolute',
@@ -2533,7 +2851,7 @@ export default function IssuesPage() {
                                     minWidth: '200px',
                                     padding: '24px',
                                     background: block.data.hw_ratio > 30 ? '#d32f2f' : 
-                                               block.data.hw_ratio <= 5 ? '#1b5e20' : '#f57c00',
+                                               block.data.hw_ratio <= 5 ? '#1b5e20' : '#FFC107',
                                     borderRadius: '16px',
                                     border: 'none',
                                     boxShadow: 'none',
@@ -2546,17 +2864,6 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    {/* 배경 장식 요소 */}
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '-50%',
-                                      right: '-50%',
-                                      width: '200%',
-                                      height: '200%',
-                                      background: 'rgba(255,255,255,0.3)',
-                                      transform: 'rotate(45deg)',
-                                      pointerEvents: 'none'
-                                    }}></div>
                                     
                                     <span style={{ 
                                       position: 'absolute',
@@ -2597,7 +2904,7 @@ export default function IssuesPage() {
                                     minWidth: '200px',
                                     padding: '24px',
                                     background: block.data.completion_rate <= 50 ? '#d32f2f' : 
-                                               block.data.completion_rate <= 80 ? '#e65100' : '#1b5e20',
+                                               block.data.completion_rate <= 80 ? '#FFC107' : '#1b5e20',
                                     borderRadius: '16px',
                                     border: 'none',
                                     boxShadow: 'none',
@@ -2610,17 +2917,6 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    {/* 배경 장식 요소 */}
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: '-50%',
-                                      right: '-50%',
-                                      width: '200%',
-                                      height: '200%',
-                                      background: 'rgba(255,255,255,0.3)',
-                                      transform: 'rotate(45deg)',
-                                      pointerEvents: 'none'
-                                    }}></div>
                                     
                                     <span style={{ 
                                       position: 'absolute',
@@ -2716,9 +3012,15 @@ export default function IssuesPage() {
                                       <span>{equipment}</span>
                                       <span style={{ 
                                         fontSize: '0.75rem', 
-                                        color: '#6c757d'
+                                        color: '#6c757d',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 0
                                       }}>
-                                        {block.data.equipment_summary[equipment].hw}건 {block.data.equipment_summary[equipment].hw_ratio}%
+                                        <span style={{ color: '#FF0000', display: 'block' }}>발생 건수: {block.data.equipment_summary[equipment].hw}</span>
+                                        <span style={{ color: '#1b5e20', display: 'block' }}>발생율: {block.data.equipment_summary[equipment].hw_ratio}%</span>
+                                        <span style={{ color: '#1976d2', display: 'block' }}>완료율: {block.data.equipment_summary[equipment].hw_completion_rate}%</span>
                                       </span>
                                     </button>
                                   ))}
@@ -2902,7 +3204,7 @@ export default function IssuesPage() {
                                                                fontSize: '0.85rem', 
                                                                color: '#ffffff', 
                                                                fontWeight: 700,
-                                                               background: issue.is_closed ? '#28a745' : '#dc3545', 
+                                                               background: issue.is_closed ? 'var(--success-color)' : 'var(--danger-color)', 
                                                                padding: '6px 10px',
                                                                borderRadius: 6,
                                                                minWidth: 'fit-content',

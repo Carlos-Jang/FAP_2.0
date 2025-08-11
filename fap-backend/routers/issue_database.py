@@ -395,11 +395,13 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
         product_titles = {}
         product_closed_status = {}
         product_issue_numbers = {}
+        product_descriptions = {}
         product_members = {}
         for issue in issue_list:
             product = issue.get('product', 'Unknown')
             is_closed = issue.get('is_closed', 0)
             subject = issue.get('subject', '제목 없음')
+            description = issue.get('description', '')
             redmine_id = issue.get('redmine_id', 0)
             assigned_to = issue.get('author_name', 'Unknown')
             
@@ -412,12 +414,14 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
                 product_titles[product] = []
                 product_closed_status[product] = []
                 product_issue_numbers[product] = []
+                product_descriptions[product] = []
                 product_members[product] = {}
             
             product_stats[product]['total'] += 1
             product_titles[product].append(subject)
             product_closed_status[product].append(is_closed)
             product_issue_numbers[product].append(redmine_id)
+            product_descriptions[product].append(description)
             
             # 인원별 통계 추가
             if assigned_to not in product_members[product]:
@@ -432,7 +436,8 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
             product_members[product][assigned_to]['issues'].append({
                 'subject': subject,
                 'redmine_id': redmine_id,
-                'is_closed': is_closed
+                'is_closed': is_closed,
+                'description': description
             })
             
             if is_closed == 1:
@@ -472,11 +477,12 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
                 'issue_titles': product_titles[product],
                 'issue_closed_status': product_closed_status[product],
                 'issue_numbers': product_issue_numbers[product],
+                'issue_descriptions': product_descriptions[product],
                 'member_details': member_details
             })
         
-        # Product별 총 건수로 정렬 (내림차순)
-        product_details.sort(key=lambda x: x['total_count'], reverse=True)
+        # Product별 완료율로 정렬 (내림차순)
+        product_details.sort(key=lambda x: x['completion_rate'], reverse=True)
         
         type_list.append({
             "tracker_name": tracker_name,
@@ -485,6 +491,7 @@ def get_type_data_list(issues: List[Dict]) -> Dict:
             "in_progress_count": in_progress_count,
             "completion_rate": round(completion_rate, 1),
             "product_details": product_details
+            
         })
     
     # 총 건수로 정렬 (내림차순)
@@ -504,6 +511,10 @@ def get_progress_summary(issues: List[Dict]) -> Dict: # 수정 불가
         tracker_name = issue.get('tracker_name', 'Unknown')
         status_name = issue.get('status_name', 'Unknown')
         is_closed = issue.get('is_closed', 0)
+        
+        # [사내]가 포함된 tracker는 그룹화하지 않음
+        if '[사내]' in tracker_name:
+            continue
         
         if tracker_name not in tracker_groups:
             tracker_groups[tracker_name] = {}
@@ -786,7 +797,6 @@ def generate_site_tooltip(issues: List[Dict]) -> str:
 
 def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str) -> List[int]:  # 수정 불가
     """Site 인덱스, Sub Site, Product 이름으로 해당하는 프로젝트 ID들을 찾는 헬퍼 함수"""
-    print(f"DEBUG: get_issue_project_ids called with product_name = '{product_name}'")
     try:
         db = DatabaseManager()
         
@@ -1734,7 +1744,6 @@ async def get_type_data(request: Request): # 수정 불가
         # 유형 데이터 로직 구현
         type_data_count = get_type_data_count(issues)
         type_data_list = get_type_data_list(issues)
-        print(f"type_data_count: {type_data_count}")
 
         # 블럭 구조로 데이터 구성
         blocks = [
@@ -1869,12 +1878,6 @@ async def get_hw_data(request: Request):
         hw_equipment_analysis = get_hw_equipment_analysis(issues)
         hw_overview_summary = get_hw_overview_summary(issues)
         
-        # 결과 로그 출력
-        print("=== HW Equipment Analysis Result ===")
-        print(f"HW Equipment Analysis: {hw_equipment_analysis}")
-        print("=== HW Overview Summary ===")
-        print(f"HW Overview Summary: {hw_overview_summary}")
-        print("===================================")
 
         # 블럭 리스트 초기화
         blocks = []
@@ -1993,8 +1996,6 @@ async def update_progress_status(request: Request): # 수정 불가
         
         if not db_result.get("success"):
             raise HTTPException(status_code=400, detail=db_result.get("message", "DB 업데이트 실패"))
-        
-        print(f"이슈 #{redmine_id} 상태 변경: {old_status_name} → {new_status_name}")
         
         return {
             "success": True,
