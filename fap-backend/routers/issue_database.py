@@ -200,7 +200,7 @@ def get_most_problematic_sites(site_index: int, start_date: str, end_date: str, 
         }
 
 
-def get_member_best_work_data(issues: List[Dict]) -> Dict: # 수정 불가
+def get_member_best_work_data(issues: List[Dict]) -> Dict: 
     """최고 성과 멤버 상세 데이터 계산 헬퍼 함수"""
     # [AE]BEST 작업인 이슈들 필터링
     best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
@@ -220,7 +220,7 @@ def get_member_best_work_data(issues: List[Dict]) -> Dict: # 수정 불가
         "data": best_member_data
     }
 
-def get_member_best_work_summary(issues: List[Dict]) -> Dict: # 수정 불가
+def get_member_best_work_summary(issues: List[Dict]) -> Dict: 
     """최고 성과 멤버 요약 데이터 계산 헬퍼 함수"""
     # [AE]BEST 작업인 이슈들 필터링
     best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
@@ -248,7 +248,7 @@ def get_member_best_work_summary(issues: List[Dict]) -> Dict: # 수정 불가
         "data": best_member_summary
     }
 
-def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
+def get_member_issue_type(issues: List[Dict]) -> Dict: 
     """멤버별 이슈 타입 데이터 조회"""
     # 작성자별 통계 계산
     member_stats = {}
@@ -330,6 +330,25 @@ def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
         
         completed_text = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(completed_text_parts) if completed_text_parts else "없음"
         
+        # 해당 작업자의 Product별 상세 일감 정보 수집
+        products_data = {}
+        for issue in issues:
+            if issue.get('author_name') == author_name:
+                product = issue.get('product', 'Unknown')
+                if product not in products_data:
+                    products_data[product] = []
+                
+                products_data[product].append({
+                    'redmine_id': issue.get('redmine_id'),
+                    'subject': issue.get('subject'),
+                    'tracker_name': issue.get('tracker_name'),
+                    'status_name': issue.get('status_name'),
+                    'created_date': issue.get('created_on'),
+                    'updated_date': issue.get('updated_on'),
+                    'description': issue.get('description'),
+                    'is_closed': issue.get('is_closed')
+                })
+        
         member_issue_data.append({
             'worker': author_name,
             'total_tasks': stats['total_tasks'],
@@ -337,7 +356,8 @@ def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
             'completed_tasks': stats['completed_tasks'],
             'completion_rate': stats['completion_rate'],
             'in_progress_types': in_progress_text,
-            'completed_types': completed_text
+            'completed_types': completed_text,
+            'products': products_data  # Product별 상세 일감 정보 추가
         })
     
     # 전체 작업 수로 정렬 (내림차순)
@@ -363,7 +383,7 @@ def get_type_data_count(issues: List[Dict]) -> Dict: # 수정 불가
         "tracker_counts": tracker_counts
     }
 
-def get_type_data_list(issues: List[Dict]) -> Dict: 
+def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
     """이슈 데이터를 받아서 유형별 상세 리스트를 생성하는 헬퍼 함수"""
     
     # tracker_name별로 이슈들을 그룹화
@@ -684,7 +704,7 @@ def get_progress_detail(issues: List[Dict]) -> Dict: # 수정 불가
         "progress_detail": detail_data
     }
 
-def generate_site_tooltip(issues: List[Dict]) -> str:
+def generate_site_tooltip(issues: List[Dict]) -> str: 
     """이슈 데이터를 받아서 Site 툴팁용 요약 텍스트를 생성하는 헬퍼 함수"""
     # 완료된 일감과 미완료 일감 분리
     completed_issues = [issue for issue in issues if issue.get('is_closed') == 1]
@@ -1036,7 +1056,7 @@ def get_issue_project_ids(site_index: int, sub_site_name: str, product_name: str
     except Exception as e:
         return []
 
-def get_hw_equipment_analysis(issues: List[Dict]) -> Dict:
+def get_hw_equipment_analysis(issues: List[Dict]) -> Dict: # 수정 불가
     """설비군별 HW 부품 문제 분석 헬퍼 함수"""
     # HW 이슈만 필터링
     hw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] HW Part']
@@ -1097,7 +1117,7 @@ def get_hw_equipment_analysis(issues: List[Dict]) -> Dict:
     
     return equipment_analysis
 
-def get_hw_overview_summary(issues: List[Dict]) -> Dict:
+def get_hw_overview_summary(issues: List[Dict]) -> Dict: # 수정 불가
     """HW 이슈 전체 요약 정보 생성 헬퍼 함수"""
     # HW 이슈만 필터링
     hw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] HW Part']
@@ -1574,7 +1594,7 @@ async def get_all_product_list(request: Request):  # 수정 불가
         raise HTTPException(status_code=500, detail=f"전체 Product List 조회 실패: {str(e)}") 
 
 @router.post("/get-summary-report")
-async def get_summary_report(request: Request):
+async def get_summary_report(request: Request): # 수정 불가
     """주간 업무보고 요약 데이터 조회 API"""
     try:
         data = await request.json()
@@ -1771,7 +1791,7 @@ async def get_type_data(request: Request): # 수정 불가
 
 
 @router.post("/get-member-data")
-async def get_member_data(request: Request): # 수정 불가
+async def get_member_data(request: Request): 
     """인원 데이터 조회 API"""
     try:
         data = await request.json()

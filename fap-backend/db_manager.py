@@ -161,7 +161,7 @@ class DatabaseManager:
                        subject, description, cost, pending, product,
                        created_on, updated_on, raw_data
                 FROM issues 
-                WHERE updated_on >= %s AND updated_on <= %s
+                WHERE created_on >= %s AND created_on <= %s
                    AND project_id IN ({id_placeholders})
                 ORDER BY updated_on DESC
             """

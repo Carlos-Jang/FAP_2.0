@@ -11,6 +11,13 @@
   --color-shadow: 0 2px 12px rgba(19,34,87,0.08);
   --color-hover: #e3e6f0;
   --color-black: #111;
+  
+  /* 완료율 기준 색상 */
+  --completion-0: #ffebee; /* 0% - 연한 빨간색 */
+  --completion-low: #fff3e0; /* 1-30% - 연한 주황색 */
+  --completion-medium: #fff8e1; /* 31-60% - 연한 노란색 */
+  --completion-high: #e8f5e8; /* 61-99% - 연한 초록색 */
+  --completion-100: #c8e6c9; /* 100% - 진한 초록색 */
 }
 
 body {

@@ -72,7 +72,14 @@ const darkThemeVars = {
   '--card-hover-transform': 'translateY(-2px)',
   '--card-hover-shadow': 'var(--shadow-hover)',
   '--success-color': '#28a745',
-  '--danger-color': '#dc3545'
+  '--danger-color': '#dc3545',
+  
+  // 완료율 기준 색상
+  '--completion-0': '#ffebee', /* 0% - 연한 빨간색 */
+  '--completion-low': '#fff3e0', /* 1-30% - 연한 주황색 */
+  '--completion-medium': '#fff8e1', /* 31-60% - 연한 노란색 */
+  '--completion-high': '#e8f5e8', /* 61-99% - 연한 초록색 */
+  '--completion-100': '#c8e6c9' /* 100% - 진한 초록색 */
 };
 
 const VIEW_TABS = [
@@ -167,6 +174,8 @@ export default function IssuesPage() {
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [memberSortBy, setMemberSortBy] = useState<'total' | 'completion'>('total');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [showTimeline, setShowTimeline] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<{text: string, x: number, y: number} | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedProgressType, setSelectedProgressType] = useState<string | null>(null);
@@ -782,7 +791,7 @@ export default function IssuesPage() {
             </div>
           </div>
 
-                    {/* SITE & Sub Site & Product List 버튼 영역 */}
+          {/* SITE & Sub Site & Product List 버튼 영역 */}
           <div style={{
             display: 'flex',
             gap: 0,
@@ -798,12 +807,12 @@ export default function IssuesPage() {
               <div style={{
                 fontWeight: 700,
                 marginBottom: 8,
-                color: '#222'
+                color: 'var(--text-white)'
               }}>SITE</div>
               <div style={{
-                background: '#f7f9fc',
-                borderRadius: 6,
-                padding: 12,
+                background: 'var(--dark-bg)',
+                borderRadius: 'var(--border-radius-card)',
+                padding: 'var(--padding-card)',
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
@@ -865,12 +874,12 @@ export default function IssuesPage() {
               <div style={{
                 fontWeight: 700,
                 marginBottom: 8,
-                color: '#222'
+                color: 'var(--text-white)'
               }}>Sub Site</div>
               <div style={{
-                background: '#f7f9fc',
-                borderRadius: 6,
-                padding: 12,
+                background: 'var(--dark-bg)',
+                borderRadius: 'var(--border-radius-card)',
+                padding: 'var(--padding-card)',
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
@@ -942,12 +951,12 @@ export default function IssuesPage() {
               <div style={{
                 fontWeight: 700,
                 marginBottom: 8,
-                color: '#222'
+                color: 'var(--text-white)'
               }}>Product List</div>
               <div style={{
-                background: '#f7f9fc',
-                borderRadius: 6,
-                padding: 12,
+                background: 'var(--dark-bg)',
+                borderRadius: 'var(--border-radius-card)',
+                padding: 'var(--padding-card)',
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
@@ -1082,9 +1091,12 @@ export default function IssuesPage() {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            color: '#888',
+            color: 'var(--text-white)',
             fontSize: '1.1rem',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            background: 'var(--dark-bg)',
+            borderRadius: 'var(--border-radius-panel)',
+            padding: 'var(--padding-panel)'
           }}>
             {activeView === 'progress' && (
               selectedProducts.length > 0 ? (
@@ -1104,10 +1116,10 @@ export default function IssuesPage() {
                           case 'progress_summary':
                             return (
                               <div key={index} style={{
-                                background: '#f8f9fa',
-                                padding: 24,
-                                borderRadius: 12,
-                                border: '1px solid #e9ecef'
+                                background: 'var(--dark-card-bg)',
+                                padding: 'var(--padding-panel)',
+                                borderRadius: 'var(--border-radius-panel)',
+                                border: '1px solid var(--border-dark)'
                               }}>
                                 {/* 업무 유형별 버튼 */}
                                 <div style={{ 
@@ -1122,9 +1134,21 @@ export default function IssuesPage() {
                                       key={trackerIndex}
                                       style={{
                                         padding: 'var(--padding-card)',
-                                        background: selectedProgressType === tracker.tracker_name ? 'var(--selected-bg)' : 
-                                                   tracker.completion_rate < 50 ? '#ffebee' :
-                                                   tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8',
+                                        background: (() => {
+                                          if (selectedProgressType === tracker.tracker_name) {
+                                            return 'var(--selected-bg)';
+                                          } else if (tracker.completion_rate === 0) {
+                                            return 'var(--completion-0)';
+                                          } else if (tracker.completion_rate <= 30) {
+                                            return 'var(--completion-low)';
+                                          } else if (tracker.completion_rate <= 60) {
+                                            return 'var(--completion-medium)';
+                                          } else if (tracker.completion_rate < 100) {
+                                            return 'var(--completion-high)';
+                                          } else {
+                                            return 'var(--completion-100)';
+                                          }
+                                        })(),
                                         border: selectedProgressType === tracker.tracker_name ? 'var(--selected-border)' : '1px solid var(--border-darker)',
                                         borderRadius: 'var(--border-radius-card)',
                                         fontSize: '0.9rem',
@@ -1155,8 +1179,19 @@ export default function IssuesPage() {
                                       }}
                                       onMouseLeave={(e) => {
                                         if (selectedProgressType !== tracker.tracker_name) {
-                                          const originalBackground = tracker.completion_rate < 50 ? '#ffebee' :
-                                                                     tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8';
+                                          const originalBackground = (() => {
+                                            if (tracker.completion_rate === 0) {
+                                              return 'var(--completion-0)';
+                                            } else if (tracker.completion_rate <= 30) {
+                                              return 'var(--completion-low)';
+                                            } else if (tracker.completion_rate <= 60) {
+                                              return 'var(--completion-medium)';
+                                            } else if (tracker.completion_rate < 100) {
+                                              return 'var(--completion-high)';
+                                            } else {
+                                              return 'var(--completion-100)';
+                                            }
+                                          })();
                                           e.currentTarget.style.background = originalBackground;
                                           e.currentTarget.style.borderColor = 'var(--border-darker)';
                                           e.currentTarget.style.transform = 'translateY(0)';
@@ -1187,10 +1222,10 @@ export default function IssuesPage() {
                           case 'progress_detail':
                             return selectedProgressType ? (
                               <div key={index} style={{
-                                background: '#f8f9fa',
-                                padding: 24,
-                                borderRadius: 12,
-                                border: '1px solid #e9ecef'
+                                background: 'var(--dark-card-bg)',
+                                padding: 'var(--padding-panel)',
+                                borderRadius: 'var(--border-radius-panel)',
+                                border: '1px solid var(--border-dark)'
                               }}>
                                 <h4 style={{
                                   margin: '0 0 16px 0',
@@ -1256,7 +1291,7 @@ export default function IssuesPage() {
                                             
                                             {/* 드롭 영역 표시 */}
                                             {dragOverStatus === status.status_name && (
-                                                                                              <div style={{
+                                              <div style={{
                                                   position: 'absolute',
                                                   top: 0,
                                                   left: 0,
@@ -1414,8 +1449,6 @@ export default function IssuesPage() {
                                     }}>
                                       {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.total_count || 0), 0) || 0}
                                     </span>
-                                    
-
                                   </div>
 
                                   {/* 진행 중 카드 */}
@@ -1459,8 +1492,6 @@ export default function IssuesPage() {
                                     }}>
                                       {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.in_progress_count || 0), 0) || 0}
                                     </span>
-                                    
-
                                   </div>
 
                                   {/* 완료 카드 */}
@@ -1504,8 +1535,6 @@ export default function IssuesPage() {
                                     }}>
                                       {block.data?.progress_data?.reduce((sum: number, item: any) => sum + (item.completed_count || 0), 0) || 0}
                                     </span>
-                                    
-
                                   </div>
 
                                   {/* 완료율 카드 */}
@@ -1559,8 +1588,6 @@ export default function IssuesPage() {
                                         return Math.round(completionRate * 10) / 10;
                                       })()}%
                                     </span>
-                                    
-
                                   </div>
                                 </div>
                                 
@@ -1577,9 +1604,21 @@ export default function IssuesPage() {
                                       key={trackerIndex}
                                       style={{
                                         padding: 'var(--padding-card)',
-                                        background: selectedProgressType === tracker.tracker_name ? 'var(--selected-bg)' : 
-                                                   tracker.completion_rate < 50 ? '#ffebee' :
-                                                   tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8',
+                                        background: (() => {
+                                          if (selectedProgressType === tracker.tracker_name) {
+                                            return 'var(--selected-bg)';
+                                          } else if (tracker.completion_rate === 0) {
+                                            return 'var(--completion-0)';
+                                          } else if (tracker.completion_rate <= 30) {
+                                            return 'var(--completion-low)';
+                                          } else if (tracker.completion_rate <= 60) {
+                                            return 'var(--completion-medium)';
+                                          } else if (tracker.completion_rate < 100) {
+                                            return 'var(--completion-high)';
+                                          } else {
+                                            return 'var(--completion-100)';
+                                          }
+                                        })(),
                                         border: selectedProgressType === tracker.tracker_name ? 'var(--selected-border)' : '1px solid var(--border-darker)',
                                         borderRadius: 'var(--border-radius-card)',
                                         fontSize: '0.9rem',
@@ -1610,8 +1649,19 @@ export default function IssuesPage() {
                                       }}
                                       onMouseLeave={(e) => {
                                         if (selectedProgressType !== tracker.tracker_name) {
-                                          const originalBackground = tracker.completion_rate < 50 ? '#ffebee' :
-                                                                     tracker.completion_rate < 80 ? '#fff3e0' : '#e8f5e8';
+                                          const originalBackground = (() => {
+                                            if (tracker.completion_rate === 0) {
+                                              return 'var(--completion-0)';
+                                            } else if (tracker.completion_rate <= 30) {
+                                              return 'var(--completion-low)';
+                                            } else if (tracker.completion_rate <= 60) {
+                                              return 'var(--completion-medium)';
+                                            } else if (tracker.completion_rate < 100) {
+                                              return 'var(--completion-high)';
+                                            } else {
+                                              return 'var(--completion-100)';
+                                            }
+                                          })();
                                           e.currentTarget.style.background = originalBackground;
                                           e.currentTarget.style.borderColor = 'var(--border-darker)';
                                           e.currentTarget.style.transform = 'translateY(0)';
@@ -1646,10 +1696,10 @@ export default function IssuesPage() {
                             }
                             return (
                               <div key={index} style={{
-                                background: '#f8f9fa',
-                                padding: 24,
-                                borderRadius: 12,
-                                border: '1px solid #e9ecef'
+                                background: 'var(--dark-card-bg)',
+                                padding: 'var(--padding-panel)',
+                                borderRadius: 'var(--border-radius-panel)',
+                                border: '1px solid var(--border-dark)'
                               }}>
      
                                 <div style={{
@@ -1946,10 +1996,7 @@ export default function IssuesPage() {
                                          );
                                        })()}
                                        {/* 일감 목록 */}
-                                       {(
-                                        
-                                        
-                                        () => {
+                                       {(() => {
                                          // 선택된 설비의 일감 정보 찾기
                                          const selectedProductDataForIssues = block.data.type_list
                                            .filter((typeItem: any) => typeItem.tracker_name === selectedProgressType)
@@ -1993,7 +2040,7 @@ export default function IssuesPage() {
                                                  color: 'var(--accent-color)',
                                                  fontSize: '1rem'
                                                }}>
-                                                 {selectedProductForMembers} 작업 목록 
+                                                 {selectedProductForMembers} 작업 목록
                                                </h5>
                                                <div style={{
                                                  display: 'flex',
@@ -2264,7 +2311,7 @@ export default function IssuesPage() {
                                         );
                                       }
                                       
-                                                                             return filteredTypeList.map((typeItem: any, typeIndex: number) => (
+                                      return filteredTypeList.map((typeItem: any, typeIndex: number) => (
                                          <div key={typeIndex} style={{ 
                                            display: 'flex', 
                                            justifyContent: 'space-between', 
@@ -2278,7 +2325,7 @@ export default function IssuesPage() {
                                          }}>
                                            {/* 좌측: 설비군별 현황 */}
                                            <div style={{ flex: 1 }}>
-                                           {/* 유형 이름 */}
+                                             {/* 유형 이름 */}
                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                                              <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
                                                {typeItem.tracker_name}
@@ -2297,7 +2344,7 @@ export default function IssuesPage() {
                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                  <span style={{ fontSize: '0.85rem', color: '#666', fontWeight: 600 }}>설비군별 현황:</span>
                                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                 {typeItem.product_details.map((product: any, productIndex: number) => (
+                                                   {typeItem.product_details.map((product: any, productIndex: number) => (
                                                    <div 
                                                      key={productIndex} 
                                                      style={{ 
@@ -2344,9 +2391,9 @@ export default function IssuesPage() {
                                                </div>
                                              )}
                                            </div>
-                                           </div>
+                                         </div>
                                            
-                                           {/* 우측: 선택된 설비군의 일감 리스트 */}
+                                         {/* 우측: 선택된 설비군의 일감 리스트 */}
                                            {selectedProduct && (
                                              <div style={{ 
                                                flex: 1, 
@@ -2407,7 +2454,7 @@ export default function IssuesPage() {
                                                              #{selectedProductData.issue_numbers[titleIndex]}
                                                            </button>
                                                            {title}
-                                           </div>
+                                                         </div>
                                                        ))}
                                                      </div>
                                                    );
@@ -2424,9 +2471,9 @@ export default function IssuesPage() {
                                                })()}
                                              </div>
                                            )}
-                                         </div>
-                                       ));
-                                     })()
+                                       </div>
+                                     ));
+                                   })()
                                   ) : (
                                     <div style={{ 
                                       textAlign: 'center', 
@@ -2460,8 +2507,8 @@ export default function IssuesPage() {
                         switch (block.type) {
                           case 'best_member_summary':
                             return (
-                              <div key={index} style={{ background: '#f8f9fa', padding: 24, borderRadius: 12, border: '1px solid #e9ecef', width: '90%' }}>
-                               <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>BEST 작업자</h4>
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)', width: '90%' }}>
+                                <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>BEST 작업자</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                   {block.data && block.data.length > 0 ? (
                                     <div style={{ 
@@ -2513,7 +2560,7 @@ export default function IssuesPage() {
                               return null;
                             }
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)' }}>
                                 <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>
                                   BEST 작업 List - {selectedAuthor}
                                 </h4>
@@ -2535,9 +2582,9 @@ export default function IssuesPage() {
                                         }}>
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                                                          <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
-                                              {member.author}
-                                            </span>
+                                              <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
+                                                {member.author}
+                                              </span>
                                               <span style={{ color: '#666', fontSize: '0.9rem' }}>
                                                 {member.product}
                                               </span>
@@ -2593,184 +2640,350 @@ export default function IssuesPage() {
                             );
                           case 'member_issue_type':
                             return (
-                              <div key={index} style={{ background: '#f7f9fc', padding: 20, borderRadius: 8 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                  <h4 style={{ margin: 0, color: '#222', fontSize: '1.2rem' }}>작업자별 이슈 유형</h4>
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    <button
-                                      onClick={() => setMemberSortBy('total')}
-                                      style={{
-                                        padding: '6px 12px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 600,
-                                        borderRadius: 6,
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        background: memberSortBy === 'total' ? '#28313b' : '#e5e8ef',
-                                        color: memberSortBy === 'total' ? '#fff' : '#222',
-                                        transition: 'all 0.15s'
-                                      }}
-                                    >
-                                      작업 개수
-                                    </button>
-                                    <button
-                                      onClick={() => setMemberSortBy('completion')}
-                                      style={{
-                                        padding: '6px 12px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 600,
-                                        borderRadius: 6,
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        background: memberSortBy === 'completion' ? '#28313b' : '#e5e8ef',
-                                        color: memberSortBy === 'completion' ? '#fff' : '#222',
-                                        transition: 'all 0.15s'
-                                      }}
-                                    >
-                                      완료율
-                                    </button>
-                                  </div>
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  {block.data && block.data.length > 0 ? (
-                                    sortMemberData(block.data, memberSortBy).map((member: any, memberIndex: number) => (
-                                      <div key={memberIndex} style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        alignItems: 'center',
-                                        padding: '16px 20px',
-                                        background: '#fff',
-                                        borderRadius: 8,
-                                        border: '1px solid #e0e0e0',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                        position: 'relative'
-                                      }}>
-                                        {/* 작업자 이름 */}
-                                        <span style={{ fontWeight: 700, color: '#28313b', fontSize: '1.1rem' }}>
-                                          {member.worker}
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)', width: '90%' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                  {block.data && block.data.map((member: any, memberIndex: number) => {
+                                    // 작업자의 총 일감 수와 완료율 계산
+                                    const totalIssues = Object.values(member.products || {}).reduce((total: number, productIssues: any) => {
+                                      return total + (Array.isArray(productIssues) ? productIssues.length : 0);
+                                    }, 0);
+                                    
+                                    const completedIssues = Object.values(member.products || {}).reduce((total: number, productIssues: any) => {
+                                      if (Array.isArray(productIssues)) {
+                                        return total + productIssues.filter((issue: any) => issue.is_closed === 1).length;
+                                      }
+                                      return total;
+                                    }, 0);
+                                    
+                                    const completionRate = totalIssues > 0 ? Math.round((completedIssues / totalIssues) * 100) : 0;
+                                    
+                                    // 완료율에 따른 색상 결정
+                                    let buttonColor = '#28313b'; // 기본 회색
+                                    if (showTimeline === member.worker) {
+                                      buttonColor = 'var(--selected-bg)'; // 선택된 경우 투명도 포함된 파란색
+                                    } else if (completionRate === 0) {
+                                      buttonColor = 'var(--completion-0)'; // 0% - 연한 빨간색
+                                    } else if (completionRate <= 30) {
+                                      buttonColor = 'var(--completion-low)'; // 1-30% - 연한 주황색
+                                    } else if (completionRate <= 60) {
+                                      buttonColor = 'var(--completion-medium)'; // 31-60% - 연한 노란색
+                                    } else if (completionRate < 100) {
+                                      buttonColor = 'var(--completion-high)'; // 61-99% - 연한 초록색
+                                    } else {
+                                      buttonColor = 'var(--completion-100)'; // 100% - 진한 초록색
+                                    }
+                                    
+                                    return (
+                                      <button
+                                        key={memberIndex}
+                                        style={{
+                                          padding: 'var(--padding-card)',
+                                          background: (() => {
+                                            if (showTimeline === member.worker) {
+                                              return 'var(--selected-bg)';
+                                            } else if (completionRate === 0) {
+                                              return 'var(--completion-0)';
+                                            } else if (completionRate <= 30) {
+                                              return 'var(--completion-low)';
+                                            } else if (completionRate <= 60) {
+                                              return 'var(--completion-medium)';
+                                            } else if (completionRate < 100) {
+                                              return 'var(--completion-high)';
+                                            } else {
+                                              return 'var(--completion-100)';
+                                            }
+                                          })(),
+                                          border: showTimeline === member.worker ? 'var(--selected-border)' : '1px solid var(--border-darker)',
+                                          borderRadius: 'var(--border-radius-card)',
+                                          fontSize: '0.9rem',
+                                          fontWeight: 600,
+                                          color: showTimeline === member.worker ? 'var(--accent-color)' : 'var(--text-white)',
+                                          cursor: 'pointer',
+                                          transition: 'var(--transition-smooth)',
+                                          minWidth: '120px',
+                                          flex: '1 1 0',
+                                          textAlign: 'center',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '4px',
+                                          boxShadow: showTimeline === member.worker ? 'var(--selected-shadow)' : 'var(--shadow-card)'
+                                        }}
+                                        onClick={() => setShowTimeline(showTimeline === member.worker ? null : member.worker)}
+                                        onMouseEnter={(e) => {
+                                          if (showTimeline !== member.worker) {
+                                            e.currentTarget.style.background = 'var(--button-hover-bg)';
+                                            e.currentTarget.style.borderColor = 'var(--button-hover-border)';
+                                            e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                            e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (showTimeline !== member.worker) {
+                                            // 완료율에 따른 원래 색상 복원
+                                            const originalColor = (() => {
+                                              if (completionRate === 0) {
+                                                return 'var(--completion-0)';
+                                              } else if (completionRate <= 30) {
+                                                return 'var(--completion-low)';
+                                              } else if (completionRate <= 60) {
+                                                return 'var(--completion-medium)';
+                                              } else if (completionRate < 100) {
+                                                return 'var(--completion-high)';
+                                              } else {
+                                                return 'var(--completion-100)';
+                                              }
+                                            })();
+                                            e.currentTarget.style.background = originalColor;
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                          }
+                                        }}
+                                      >
+                                        <span>{member.worker}</span>
+                                        <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                                          {totalIssues}건 / {completionRate}%
                                         </span>
-                                        
-                                        {/* 통계 정보 */}
-                                        <div style={{ display: 'flex', gap: 16, fontSize: '0.9rem', color: '#555' }}>
-                                          <span>전체: <strong style={{ color: '#28313b' }}>{member.total_tasks}건</strong></span>
-                                          
-                                          {/* 진행 중 - 호버 툴팁 */}
-                                          <span 
-                                            style={{ 
-                                              cursor: 'pointer',
-                                              position: 'relative'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                              if (tooltip) tooltip.style.display = 'block';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                              if (tooltip) tooltip.style.display = 'none';
-                                            }}
-                                          >
-                                            진행 중: <strong style={{ color: '#FF6B6B' }}>{member.in_progress_tasks}건</strong>
-                                            <div className="tooltip" style={{
-                                              position: 'absolute',
-                                              top: '100%',
-                                              left: '50%',
-                                              transform: 'translateX(-50%)',
-                                              background: '#fff',
-                                              color: '#333',
-                                              padding: '12px 16px',
-                                              borderRadius: '8px',
-                                              fontSize: '0.85rem',
-                                              whiteSpace: 'nowrap',
-                                              zIndex: 9999,
-                                              display: 'none',
-                                              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                                              border: '1px solid #000',
-                                              marginTop: '8px',
-                                              pointerEvents: 'none'
-                                            }}>
-                                              <div style={{ fontWeight: 600, marginBottom: '8px', color: '#FF6B6B' }}>진행 중 작업 유형:</div>
-                                              <div dangerouslySetInnerHTML={{ __html: member.in_progress_types }} />
-                                              <div style={{
-                                                position: 'absolute',
-                                                bottom: '100%',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                width: 0,
-                                                height: 0,
-                                                borderLeft: '8px solid transparent',
-                                                borderRight: '8px solid transparent',
-                                                borderBottom: '8px solid #000'
-                                              }}></div>
-                                            </div>
-                                          </span>
-                                          
-                                          {/* 완료 - 호버 툴팁 */}
-                                          <span 
-                                            style={{ 
-                                              cursor: 'pointer',
-                                              position: 'relative'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                              if (tooltip) tooltip.style.display = 'block';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              const tooltip = e.currentTarget.querySelector('.tooltip') as HTMLElement;
-                                              if (tooltip) tooltip.style.display = 'none';
-                                            }}
-                                          >
-                                            완료: <strong style={{ color: '#4CAF50' }}>{member.completed_tasks}건</strong>
-                                            <div className="tooltip" style={{
-                                              position: 'absolute',
-                                              top: '100%',
-                                              left: '50%',
-                                              transform: 'translateX(-50%)',
-                                              background: '#fff',
-                                              color: '#333',
-                                              padding: '12px 16px',
-                                              borderRadius: '8px',
-                                              fontSize: '0.85rem',
-                                              whiteSpace: 'nowrap',
-                                              zIndex: 9999,
-                                              display: 'none',
-                                              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                                              border: '1px solid #000',
-                                              marginTop: '8px',
-                                              pointerEvents: 'none'
-                                            }}>
-                                              <div style={{ fontWeight: 600, marginBottom: '8px', color: '#4CAF50' }}>완료 작업 유형:</div>
-                                              <div dangerouslySetInnerHTML={{ __html: member.completed_types }} />
-                                              <div style={{
-                                                position: 'absolute',
-                                                bottom: '100%',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                width: 0,
-                                                height: 0,
-                                                borderLeft: '8px solid transparent',
-                                                borderRight: '8px solid transparent',
-                                                borderBottom: '8px solid #000'
-                                              }}></div>
-                                            </div>
-                                          </span>
-                                          
-                                          <span>완료율: <strong style={{ color: '#2196F3' }}>{member.completion_rate}%</strong></span>
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div style={{ 
-                                      textAlign: 'center', 
-                                      padding: '40px 20px', 
-                                      color: '#666',
-                                      background: '#fff',
-                                      borderRadius: 8,
-                                      border: '1px solid #e0e0e0'
-                                    }}>
-                                      해당 기간에 작업자별 이슈 유형 데이터가 없습니다.
-                                    </div>
-                                  )}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
+                                
+                                {/* 타임 테이블 빈 박스 */}
+                                {showTimeline && (
+                                  <div style={{
+                                    flex: 1, 
+                                    background: 'var(--dark-bg)', 
+                                    borderRadius: 'var(--border-radius-panel)', 
+                                    padding: 'var(--padding-panel)',
+                                    border: `1px solid var(--border-dark)`,
+                                    boxShadow: 'var(--shadow-dark)'
+                                  }}>
+                                    <h5 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.1rem' }}>
+                                      {(() => {
+                                        const selectedMember = block.data.find((member: any) => member.worker === showTimeline);
+                                        if (!selectedMember) return `${showTimeline} - 작업 타임 테이블`;
+                                        
+                                        const inProgressTypes = selectedMember.in_progress_types || '';
+                                        const completedTypes = selectedMember.completed_types || '';
+                                        
+                                        if (inProgressTypes && completedTypes) {
+                                          return (
+                                            <div>
+                                              <div>{showTimeline}</div>
+                                              <div style={{ fontSize: '1rem', color: '#666', marginTop: '4px' }}>
+                                                진행중 :  <span dangerouslySetInnerHTML={{ __html: inProgressTypes }} />
+                                              </div>
+                                              <div style={{ fontSize: '1rem', color: '#666' }}>
+                                                완료 :  <span dangerouslySetInnerHTML={{ __html: completedTypes }} />
+                                              </div>
+                                            </div>
+                                          );
+                                        } else {
+                                          return `${showTimeline} - 작업 타임 테이블`;
+                                        }
+                                      })()}
+                                    </h5>
+                                    <div style={{ overflowX: 'auto' }}>
+                                      <table style={{ 
+                                        width: '100%', 
+                                        borderCollapse: 'collapse',
+                                        fontSize: '0.85rem',
+                                        tableLayout: 'fixed'
+                                      }}>
+                                        <thead>
+                                          <tr>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px'
+                                            }}>
+                                              작업 설비
+                                            </th>
+                                            {(() => {
+                                              const dateRange = [];
+                                              const startDate = new Date(dateFrom);
+                                              const endDate = new Date(dateTo);
+                                              
+                                              for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                                                dateRange.push(new Date(d).toISOString().slice(0, 10));
+                                              }
+                                              
+                                              return dateRange.map((date, index) => (
+                                                <th key={index} style={{ 
+                                                  padding: '8px', 
+                                                  border: '1px solid #ddd', 
+                                                  background: '#f5f5f5',
+                                                  width: '120px',
+                                                  textAlign: 'center',
+                                                  fontSize: '0.8rem'
+                                                }}>
+                                                  {date}
+                                                </th>
+                                              ));
+                                            })()}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(() => {
+                                            // 선택된 작업자의 products 데이터 찾기
+                                            const selectedMember = block.data.find((member: any) => member.worker === showTimeline);
+                                            const products = selectedMember?.products || {};
+                                            
+                                            return Object.keys(products).map((product, productIndex) => (
+                                              <tr key={productIndex}>
+                                                <td style={{ 
+                                                  padding: '8px', 
+                                                  border: '1px solid #ddd', 
+                                                  background: '#f9f9f9',
+                                                  fontWeight: 600
+                                                }}>
+                                                  {product}
+                                                </td>
+                                                {(() => {
+                                                  const dateRange = [];
+                                                  const startDate = new Date(dateFrom);
+                                                  const endDate = new Date(dateTo);
+                                                  
+                                                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                                                    dateRange.push(new Date(d).toISOString().slice(0, 10));
+                                                  }
+                                                  
+                                                  return dateRange.map((date, dateIndex) => (
+                                                    <td key={dateIndex} style={{ 
+                                                      padding: '4px', 
+                                                      border: '1px solid #ddd',
+                                                      verticalAlign: 'top',
+                                                      minHeight: '60px'
+                                                    }}>
+                                                      {(() => {
+                                                        // 해당 날짜와 product에 맞는 일감들 필터링 (생성일 기준, 한국 시간으로 변환)
+                                                        const dayIssues = products[product].filter((issue: any) => {
+                                                          // 한국 시간으로 변환 (UTC+9)
+                                                          const issueDate = new Date(issue.created_date);
+                                                          const koreaTime = new Date(issueDate.getTime() + (9 * 60 * 60 * 1000));
+                                                          const targetDate = new Date(date);
+                                                          return koreaTime.toISOString().slice(0, 10) === targetDate.toISOString().slice(0, 10);
+                                                        });
+                                                        
+                                                        return dayIssues.map((issue: any, issueIndex: number) => {
+                                                          // tracker_name에 따른 색상 결정
+                                                          let cardColor = '#e3f2fd'; // 기본 파란색
+                                                          let borderColor = '#bbdefb';
+                                                          
+                                                          if (issue.tracker_name.includes('HW')) {
+                                                            cardColor = '#ffebee'; // 연한 빨간색
+                                                            borderColor = '#ffcdd2';
+                                                          } else if (issue.tracker_name.includes('SW')) {
+                                                            cardColor = '#e8f5e8'; // 연한 초록색
+                                                            borderColor = '#c8e6c9';
+                                                          } else if (issue.tracker_name.includes('Setup')) {
+                                                            cardColor = '#f3e5f5'; // 연한 보라색
+                                                            borderColor = '#e1bee7';
+                                                          } else if (issue.tracker_name.includes('확산')) {
+                                                            cardColor = '#f5f5f5'; // 연한 회색
+                                                            borderColor = '#e0e0e0';
+                                                          }
+                                                          
+                                                          return (
+                                                            <div 
+                                                              key={issueIndex} 
+                                                              style={{
+                                                                background: cardColor,
+                                                                padding: '8px 12px',
+                                                                margin: '4px 0',
+                                                                borderRadius: 'var(--border-radius-card)',
+                                                                fontSize: '0.8rem',
+                                                                border: `1px solid ${borderColor}`,
+                                                                boxShadow: 'var(--shadow-card)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px',
+                                                                cursor: 'pointer',
+                                                                transition: 'var(--transition-smooth)'
+                                                              }}
+                                                              onMouseEnter={(e) => {
+                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                setTooltip({
+                                                                  text: issue.subject,
+                                                                  x: e.clientX,
+                                                                  y: e.clientY
+                                                                });
+                                                                // 호버 효과 추가
+                                                                e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                                                e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                                                e.currentTarget.style.borderColor = 'var(--accent-border)';
+                                                              }}
+                                                              onMouseLeave={(e) => {
+                                                                setTooltip(null);
+                                                                // 호버 효과 제거
+                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                                e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                                                e.currentTarget.style.borderColor = borderColor;
+                                                              }}
+                                                              onClick={() => {
+                                                                setSelectedIssue(issue);
+                                                                setIsModalOpen(true);
+                                                              }}
+                                                            >
+                                                              <div style={{ 
+                                                                background: issue.is_closed === 1 ? '#4CAF50' : '#FF6B6B',
+                                                                color: 'white',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '6px',
+                                                                fontWeight: 600,
+                                                                fontSize: '0.75rem',
+                                                                minWidth: 'fit-content'
+                                                              }}>
+                                                                #{issue.redmine_id}
+                                                              </div>
+                                                              <div style={{ 
+                                                                fontSize: '0.8rem',
+                                                                color: '#333',
+                                                                fontWeight: 500,
+                                                                flex: 1,
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis'
+                                                              }}>
+                                                                {issue.subject}
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        });
+                                                      })()}
+                                                    </td>
+                                                  ));
+                                                })()}
+                                              </tr>
+                                            ));
+                                          })()}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* 커스텀 툴팁 */}
+                                {tooltip && (
+                                  <div style={{
+                                    position: 'fixed',
+                                    left: tooltip.x + 10,
+                                    top: tooltip.y - 30,
+                                    background: '#333',
+                                    color: '#fff',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    zIndex: 9999,
+                                    maxWidth: '300px',
+                                    wordWrap: 'break-word',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                    pointerEvents: 'none'
+                                  }}>
+                                    {tooltip.text}
+                                  </div>
+                                )}
                               </div>
                             );
                           default:
@@ -2791,7 +3004,7 @@ export default function IssuesPage() {
                         switch (block.type) {
                           case 'hw_overview':
                             return (
-                              <div key={index} style={{ background: '#f8f9fa', padding: 24, borderRadius: 12, border: '1px solid #e9ecef' }}>
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)' }}>
                                 <div style={{ display: 'flex', gap: 16 }}>
                                   <div style={{ 
                                     flex: 1,
@@ -2810,8 +3023,6 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-
-                                    
                                     <span style={{ 
                                       position: 'absolute',
                                       top: '16px',
@@ -2864,7 +3075,6 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    
                                     <span style={{ 
                                       position: 'absolute',
                                       top: '16px',
@@ -2917,7 +3127,6 @@ export default function IssuesPage() {
                                     overflow: 'hidden',
                                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                   }}>
-                                    
                                     <span style={{ 
                                       position: 'absolute',
                                       top: '16px',
@@ -2960,8 +3169,8 @@ export default function IssuesPage() {
                                 {/* 설비군 버튼들 */}
                                 <div style={{ 
                                   marginTop: '24px',
-                                display: 'flex', 
-                                flexWrap: 'wrap', 
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
                                   gap: '12px',
                                   justifyContent: 'flex-start'
                                 }}>
@@ -2970,9 +3179,21 @@ export default function IssuesPage() {
                                       key={index}
                                       style={{
                                         padding: 'var(--padding-card)',
-                                        background: selectedEquipment === equipment ? 'var(--selected-bg)' :
-                                                    block.data.equipment_summary[equipment].hw_completion_rate <= 50 ? '#ffebee' :
-                                                    block.data.equipment_summary[equipment].hw_completion_rate <= 80 ? '#fff3e0' : '#e8f5e8',
+                                        background: (() => {
+                                          if (selectedEquipment === equipment) {
+                                            return 'var(--selected-bg)';
+                                          } else if (block.data.equipment_summary[equipment].hw_completion_rate === 0) {
+                                            return 'var(--completion-0)';
+                                          } else if (block.data.equipment_summary[equipment].hw_completion_rate <= 30) {
+                                            return 'var(--completion-low)';
+                                          } else if (block.data.equipment_summary[equipment].hw_completion_rate <= 60) {
+                                            return 'var(--completion-medium)';
+                                          } else if (block.data.equipment_summary[equipment].hw_completion_rate < 100) {
+                                            return 'var(--completion-high)';
+                                          } else {
+                                            return 'var(--completion-100)';
+                                          }
+                                        })(),
                                         border: selectedEquipment === equipment ? 'var(--selected-border)' : '1px solid var(--border-darker)',
                                         borderRadius: 'var(--border-radius-card)',
                                         fontSize: '0.9rem',
@@ -3000,8 +3221,19 @@ export default function IssuesPage() {
                                       onMouseLeave={(e) => {
                                         if (selectedEquipment !== equipment) {
                                           const completionRate = block.data.equipment_summary[equipment].hw_completion_rate;
-                                          const originalColor = completionRate <= 50 ? '#ffebee' :
-                                                               completionRate <= 80 ? '#fff3e0' : '#e8f5e8';
+                                          const originalColor = (() => {
+                                            if (completionRate === 0) {
+                                              return 'var(--completion-0)';
+                                            } else if (completionRate <= 30) {
+                                              return 'var(--completion-low)';
+                                            } else if (completionRate <= 60) {
+                                              return 'var(--completion-medium)';
+                                            } else if (completionRate < 100) {
+                                              return 'var(--completion-high)';
+                                            } else {
+                                              return 'var(--completion-100)';
+                                            }
+                                          })();
                                           e.currentTarget.style.background = originalColor;
                                           e.currentTarget.style.borderColor = 'var(--border-darker)';
                                           e.currentTarget.style.transform = 'translateY(0)';
@@ -3025,20 +3257,18 @@ export default function IssuesPage() {
                                     </button>
                                   ))}
                                 </div>
-                                
-
                               </div>
                             );
                           case 'hw_summary':
                             return (
-                              <div key={index} style={{ background: '#f8f9fa', padding: 24, borderRadius: 12, border: '1px solid #e9ecef' }}>
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)' }}>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                   {selectedEquipment && block.data[selectedEquipment] ? (
                                     (() => {
                                       const equipmentData = block.data[selectedEquipment];
                                       return (
-                                                                                 <div style={{ display: 'flex', gap: 24 }}>
+                                        <div style={{ display: 'flex', gap: 24 }}>
                                            {/* 왼쪽 패널: 문제 Part List */}
                                            <div style={{ 
                                              flex: 1, 
@@ -3297,7 +3527,7 @@ export default function IssuesPage() {
               maxHeight: '80vh',
               overflowY: 'auto',
               position: 'relative',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+              boxShadow: 'var(--shadow-dark)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
