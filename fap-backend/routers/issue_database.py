@@ -200,7 +200,7 @@ def get_most_problematic_sites(site_index: int, start_date: str, end_date: str, 
         }
 
 
-def get_member_best_work_data(issues: List[Dict]) -> Dict: 
+def get_member_best_work_data(issues: List[Dict]) -> Dict: # 수정 불가
     """최고 성과 멤버 상세 데이터 계산 헬퍼 함수"""
     # [AE]BEST 작업인 이슈들 필터링
     best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
@@ -220,7 +220,7 @@ def get_member_best_work_data(issues: List[Dict]) -> Dict:
         "data": best_member_data
     }
 
-def get_member_best_work_summary(issues: List[Dict]) -> Dict: 
+def get_member_best_work_summary(issues: List[Dict]) -> Dict: # 수정 불가
     """최고 성과 멤버 요약 데이터 계산 헬퍼 함수"""
     # [AE]BEST 작업인 이슈들 필터링
     best_issues = [issue for issue in issues if issue.get('status_name') == '[AE]BEST 작업']
@@ -248,7 +248,7 @@ def get_member_best_work_summary(issues: List[Dict]) -> Dict:
         "data": best_member_summary
     }
 
-def get_member_issue_type(issues: List[Dict]) -> Dict: 
+def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
     """멤버별 이슈 타입 데이터 조회"""
     # 작성자별 통계 계산
     member_stats = {}
@@ -1183,7 +1183,7 @@ def get_hw_overview_summary(issues: List[Dict]) -> Dict: # 수정 불가
         "equipment_summary": equipment_summary
     }
 
-def get_sw_overview_summary(issues: List[Dict]) -> Dict:
+def get_sw_overview_summary(issues: List[Dict]) -> Dict: # 수정 불가
     """SW 이슈 전체 요약 정보 생성 헬퍼 함수"""
     # SW 이슈만 필터링
     sw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] SW Part']
@@ -1249,7 +1249,7 @@ def get_sw_overview_summary(issues: List[Dict]) -> Dict:
         "equipment_summary": equipment_summary
     }
 
-def get_sw_detail_analysis(issues: List[Dict]) -> Dict:
+def get_sw_detail_analysis(issues: List[Dict]) -> Dict: # 수정 불가
     """SW 이슈 상세 분석 헬퍼 함수"""
     # SW 이슈만 필터링
     sw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] SW Part']
@@ -1934,7 +1934,7 @@ async def get_type_data(request: Request): # 수정 불가
 
 
 @router.post("/get-member-data")
-async def get_member_data(request: Request): 
+async def get_member_data(request: Request): # 수정 불가
     """인원 데이터 조회 API"""
     try:
         data = await request.json()
@@ -1998,7 +1998,7 @@ async def get_member_data(request: Request):
         raise HTTPException(status_code=500, detail=f"인원 데이터 조회 실패: {str(e)}")
 
 @router.post("/get-hw-data")
-async def get_hw_data(request: Request):
+async def get_hw_data(request: Request): # 수정 불가
     """HW 데이터 조회 API"""
     try:
         data = await request.json()
@@ -2077,7 +2077,7 @@ async def get_hw_data(request: Request):
 
 
 @router.post("/get-sw-data")
-async def get_sw_data(request: Request):
+async def get_sw_data(request: Request): # 수정 불가
     """SW 데이터 조회 API"""
     try:
         data = await request.json()

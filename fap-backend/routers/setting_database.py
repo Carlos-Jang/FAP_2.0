@@ -157,4 +157,29 @@ async def sync_projects(limit: int = Query(1000, ge=1, le=1000, description="동
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"프로젝트 동기화 실패: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"프로젝트 동기화 실패: {str(e)}")
+
+@router.post("/sync-roadmap-data")
+async def sync_roadmap_data():  # 수정 불가
+    """레드맵 데이터 동기화"""
+    try:
+        db = DatabaseManager()
+        result = db.sync_roadmap_data()
+        
+        if result['success']:
+            return {
+                "success": True,
+                "message": result['message'],
+                "data": {
+                    "count": result['count'],
+                    "saved": result.get('saved', 0),
+                    "updated": result.get('updated', 0)
+                }
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result['error'])
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"로드맵 데이터 동기화 실패: {str(e)}") 

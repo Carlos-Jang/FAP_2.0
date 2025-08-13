@@ -771,7 +771,7 @@ class DatabaseManager:
         project['data'] = self._parse_issue_data(project['raw_data'])  # 일감과 동일한 방식
         return project
       
-    def sync_projects(self, limit: int = 1000) -> Dict:  # 수정 불가
+    def sync_projects(self, limit: int = 1000) -> Dict:  # 미사용 
         """레드마인에서 프로젝트 목록을 가져와서 DB에 저장 (50개씩 병렬 처리)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1009,7 +1009,7 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def sync_projects_fast(self, limit: int = 1000) -> Dict:
+    def sync_projects_fast(self, limit: int = 1000) -> Dict: # 수정 불가
         """레드마인에서 프로젝트 목록을 빠르게 가져와서 DB에 저장 (자식 프로젝트 조회 없이)"""
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1155,7 +1155,7 @@ class DatabaseManager:
                 'count': 0
             }
 
-    def analyze_and_save_project_relationships(self) -> Dict:
+    def analyze_and_save_project_relationships(self) -> Dict: # 수정 불가
         """projects_default에서 관계 분석해서 projects 테이블에 저장"""
         try:
             print("프로젝트 관계 분석 및 저장 시작...")
@@ -1256,7 +1256,7 @@ class DatabaseManager:
                 'error': f'프로젝트 관계 분석 실패: {str(e)}'
             }
     
-    def calculate_project_level(self, project_id: int, projects_dict: Dict) -> int:
+    def calculate_project_level(self, project_id: int, projects_dict: Dict) -> int: # 수정 불가
         """프로젝트 레벨 계산"""
         from config import ATI_PROJECT_IDS, CUSTOMER_PROJECT_IDS
         
@@ -1432,6 +1432,149 @@ class DatabaseManager:
             return {
                 "success": False,
                 "message": f"API 키 저장 중 오류 발생: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+
+# ===== 로드맵 관련 메서드들 =====
+
+    def sync_roadmap_data(self) -> Dict:
+        """로드맵 데이터 동기화 - PMS에서 로드맵 정보를 가져와서 DB에 저장"""
+        try:
+            import requests
+            from config import REDMINE_URL, API_KEY, CUSTOMER_PROJECT_IDS
+            
+            headers = {'X-Redmine-API-Key': API_KEY}
+            saved_count = 0
+            updated_count = 0
+            total_versions = 0
+            
+            print(f"로드맵 동기화 시작 - 총 {len(CUSTOMER_PROJECT_IDS)}개 프로젝트 처리 예정")
+            print(f"처리할 프로젝트 ID들: {CUSTOMER_PROJECT_IDS}")
+            
+            # DB 연결
+            conn = self.get_connection()
+            if not conn:
+                return {
+                    "success": False,
+                    "error": "DB 연결 실패"
+                }
+            
+            cursor = conn.cursor()
+            
+            # 기존 로드맵 데이터 모두 삭제
+            cursor.execute("TRUNCATE TABLE roadmap_versions")
+            print("기존 로드맵 데이터 삭제 완료")
+            
+            # 각 고객사 프로젝트별로 로드맵 데이터 가져오기
+            for project_id in CUSTOMER_PROJECT_IDS:
+                try:
+                    print(f"\n프로젝트 {project_id} 처리 시작...")
+                    
+                    # 프로젝트 정보 가져오기
+                    project_url = f"{REDMINE_URL}/projects/{project_id}.json"
+                    project_response = requests.get(project_url, headers=headers, timeout=10)
+                    
+                    print(f"프로젝트 {project_id} 응답 상태: {project_response.status_code}")
+                    
+                    if project_response.status_code != 200:
+                        print(f"프로젝트 {project_id} 조회 실패 - 상태 코드: {project_response.status_code}")
+                        continue
+                    
+                    project_data = project_response.json().get('project', {})
+                    project_name = project_data.get('name', '')
+                    project_identifier = project_data.get('identifier', '')
+                    
+                    print(f"프로젝트 {project_id}: {project_name} (식별자: {project_identifier})")
+                    
+                    # 프로젝트의 로드맵(버전) 정보 가져오기
+                    versions_url = f"{REDMINE_URL}/projects/{project_identifier}/versions.json"
+                    versions_response = requests.get(versions_url, headers=headers, timeout=10)
+                    
+                    print(f"버전 조회 URL: {versions_url}")
+                    print(f"버전 조회 응답 상태: {versions_response.status_code}")
+                    
+                    if versions_response.status_code != 200:
+                        print(f"프로젝트 {project_id} 버전 조회 실패 - 상태 코드: {versions_response.status_code}")
+                        continue
+                    
+                    versions_data = versions_response.json()
+                    versions = versions_data.get('versions', [])
+                    
+                    print(f"프로젝트 {project_id}에서 {len(versions)}개 버전 발견")
+                    
+                    for version in versions:
+                        version_id = version.get('id')
+                        version_name = version.get('name', '')
+                        status = version.get('status', '')
+                        description = version.get('description', '')
+                        due_date = version.get('due_date')
+                        created_on = version.get('created_on')
+                        updated_on = version.get('updated_on')
+                        wiki_page_title = version.get('wiki_page_title', '')
+                        
+                        # 위키 페이지 URL 생성
+                        wiki_page_url = ""
+                        if wiki_page_title:
+                            wiki_page_url = f"{REDMINE_URL}/projects/{project_identifier}/wiki/{wiki_page_title}"
+                        
+                        # 연결된 일감 ID들 가져오기
+                        connected_issue_ids = []
+                        try:
+                            issues_url = f"{REDMINE_URL}/issues.json?fixed_version_id={version_id}"
+                            issues_response = requests.get(issues_url, headers=headers, timeout=10)
+                            
+                            if issues_response.status_code == 200:
+                                issues_data = issues_response.json()
+                                issues = issues_data.get('issues', [])
+                                connected_issue_ids = [str(issue.get('id')) for issue in issues]
+                        except:
+                            pass  # 일감 조회 실패 시 무시
+                        
+                        # 쉼표로 구분된 ID 리스트로 변환
+                        connected_issue_ids_str = ','.join(connected_issue_ids) if connected_issue_ids else ''
+                        
+                        # "기본설정" 또는 "기본 설정"인 경우 제외
+                        if version_name.strip() in ["기본설정", "기본 설정"]:
+                            print(f"버전 '{version_name}' 제외 (기본설정)")
+                            continue
+                        
+                        # 새 데이터 삽입 (TRUNCATE 후이므로 항상 INSERT)
+                        cursor.execute("""
+                            INSERT INTO roadmap_versions 
+                            (redmine_version_id, project_id, project_name, version_name, status, description,
+                             due_date, created_on, updated_on, wiki_page_title, wiki_page_url, connected_issue_ids)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (version_id, project_id, project_name, version_name, status, description,
+                              due_date, created_on, updated_on, wiki_page_title, wiki_page_url, connected_issue_ids_str))
+                        saved_count += 1
+                        
+                        total_versions += 1
+                
+                except Exception as e:
+                    print(f"프로젝트 {project_id} 로드맵 동기화 중 오류: {str(e)}")
+                    continue
+            
+            conn.commit()
+            
+            return {
+                "success": True,
+                "message": f"로드맵 데이터 동기화 완료. 총 {total_versions}개 버전 처리됨",
+                "count": total_versions,
+                "saved": saved_count,
+                "updated": 0  # TRUNCATE 방식이므로 updated는 항상 0
+            }
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {
+                "success": False,
+                "error": f"로드맵 데이터 동기화 실패: {str(e)}"
             }
         finally:
             if cursor:

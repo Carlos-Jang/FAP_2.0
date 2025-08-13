@@ -134,6 +134,21 @@ export default function SettingPage() {
     }
   };
 
+  const handleLoadRoadmapData = async () => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/settings/sync-roadmap-data');
+      
+      if (response.data.success) {
+        alert(`로드맵 데이터 로드 완료!\n${response.data.message}\n총 ${response.data.data.count}개 로드맵 처리됨`);
+      } else {
+        alert('로드맵 데이터 로드 실패: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('로드맵 데이터 로드 에러:', error);
+      alert('로드맵 데이터 로드 중 오류가 발생했습니다.');
+    }
+  };
+
   // PC/모바일 환경 감지 (900px 이하를 모바일로 간주)
   const isMobile = window.innerWidth <= 900;
 
@@ -286,6 +301,16 @@ export default function SettingPage() {
                     onClick={handleLoadIssueStatuses}
                   >
                     Load Issue Status
+                  </button>
+                </div>
+                
+                {/* Load Roadmap Data */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button 
+                    style={{...btnStyle, background: '#dc3545'}} 
+                    onClick={handleLoadRoadmapData}
+                  >
+                    Load Roadmap Data
                   </button>
                 </div>
               </div>
