@@ -183,6 +183,8 @@ export default function IssuesPage() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
+  const [selectedMemberEquipment, setSelectedMemberEquipment] = useState<string | null>(null);
+  const [selectedSWProject, setSelectedSWProject] = useState<string | null>(null);
 
   // 드래그 앤 드롭 관련 상태
   const [draggedIssue, setDraggedIssue] = useState<any>(null);
@@ -2708,7 +2710,10 @@ export default function IssuesPage() {
                                           gap: '4px',
                                           boxShadow: showTimeline === member.worker ? 'var(--selected-shadow)' : 'var(--shadow-card)'
                                         }}
-                                        onClick={() => setShowTimeline(showTimeline === member.worker ? null : member.worker)}
+                                        onClick={() => {
+                                          setShowTimeline(showTimeline === member.worker ? null : member.worker);
+                                          setSelectedMemberEquipment(null); // 설비군 선택 초기화
+                                        }}
                                         onMouseEnter={(e) => {
                                           if (showTimeline !== member.worker) {
                                             e.currentTarget.style.background = 'var(--button-hover-bg)';
@@ -2801,162 +2806,273 @@ export default function IssuesPage() {
                                               작업 설비
                                             </th>
                                             {(() => {
-                                              const dateRange = [];
-                                              const startDate = new Date(dateFrom);
-                                              const endDate = new Date(dateTo);
+                                              const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+                                              const weekendIndices = [5, 6]; // 토요일(5), 일요일(6)
                                               
-                                              for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                                                dateRange.push(new Date(d).toISOString().slice(0, 10));
-                                              }
-                                              
-                                              return dateRange.map((date, index) => (
-                                                <th key={index} style={{ 
-                                                  padding: '8px', 
-                                                  border: '1px solid #ddd', 
-                                                  background: '#f5f5f5',
-                                                  width: '120px',
-                                                  textAlign: 'center',
-                                                  fontSize: '0.8rem'
-                                                }}>
-                                                  {date}
-                                                </th>
-                                              ));
+                                              return dayNames.map((dayName, index) => {
+                                                const isWeekend = weekendIndices.includes(index);
+                                                
+                                                return (
+                                                  <th key={index} style={{ 
+                                                    padding: '8px', 
+                                                    border: '1px solid #ddd', 
+                                                    background: isWeekend ? '#fff3e0' : '#f5f5f5',
+                                                    width: '120px',
+                                                    textAlign: 'center',
+                                                    fontSize: '0.8rem',
+                                                    color: isWeekend ? '#f57c00' : '#333'
+                                                  }}>
+                                                    {dayName}
+                                                  </th>
+                                                );
+                                              });
                                             })()}
                                           </tr>
                                         </thead>
-                                        <tbody>
+                                                                                                                        <tbody>
                                           {(() => {
                                             // 선택된 작업자의 products 데이터 찾기
                                             const selectedMember = block.data.find((member: any) => member.worker === showTimeline);
                                             const products = selectedMember?.products || {};
                                             
-                                            return Object.keys(products).map((product, productIndex) => (
-                                              <tr key={productIndex}>
-                                                <td style={{ 
-                                                  padding: '8px', 
-                                                  border: '1px solid #ddd', 
-                                                  background: '#f9f9f9',
-                                                  fontWeight: 600
-                                                }}>
-                                                  {product}
-                                                </td>
-                                                {(() => {
-                                                  const dateRange = [];
-                                                  const startDate = new Date(dateFrom);
-                                                  const endDate = new Date(dateTo);
-                                                  
-                                                  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                                                    dateRange.push(new Date(d).toISOString().slice(0, 10));
-                                                  }
-                                                  
-                                                  return dateRange.map((date, dateIndex) => (
-                                                    <td key={dateIndex} style={{ 
-                                                      padding: '4px', 
-                                                      border: '1px solid #ddd',
-                                                      verticalAlign: 'top',
-                                                      minHeight: '60px'
-                                                    }}>
-                                                      {(() => {
-                                                        // 해당 날짜와 product에 맞는 일감들 필터링 (생성일 기준, 한국 시간으로 변환)
-                                                        const dayIssues = products[product].filter((issue: any) => {
-                                                          // 한국 시간으로 변환 (UTC+9)
-                                                          const issueDate = new Date(issue.created_date);
-                                                          const koreaTime = new Date(issueDate.getTime() + (9 * 60 * 60 * 1000));
-                                                          const targetDate = new Date(date);
-                                                          return koreaTime.toISOString().slice(0, 10) === targetDate.toISOString().slice(0, 10);
-                                                        });
-                                                        
-                                                        return dayIssues.map((issue: any, issueIndex: number) => {
-                                                          // tracker_name에 따른 색상 결정
-                                                          let cardColor = '#e3f2fd'; // 기본 파란색
-                                                          let borderColor = '#bbdefb';
-                                                          
-                                                          if (issue.tracker_name.includes('HW')) {
-                                                            cardColor = '#ffebee'; // 연한 빨간색
-                                                            borderColor = '#ffcdd2';
-                                                          } else if (issue.tracker_name.includes('SW')) {
-                                                            cardColor = '#e8f5e8'; // 연한 초록색
-                                                            borderColor = '#c8e6c9';
-                                                          } else if (issue.tracker_name.includes('Setup')) {
-                                                            cardColor = '#f3e5f5'; // 연한 보라색
-                                                            borderColor = '#e1bee7';
-                                                          } else if (issue.tracker_name.includes('확산')) {
-                                                            cardColor = '#f5f5f5'; // 연한 회색
-                                                            borderColor = '#e0e0e0';
-                                                          }
-                                                          
-                                                          return (
-                                                            <div 
-                                                              key={issueIndex} 
-                                                              style={{
-                                                                background: cardColor,
-                                                                padding: '8px 12px',
-                                                                margin: '4px 0',
-                                                                borderRadius: 'var(--border-radius-card)',
-                                                                fontSize: '0.8rem',
-                                                                border: `1px solid ${borderColor}`,
-                                                                boxShadow: 'var(--shadow-card)',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '8px',
-                                                                cursor: 'pointer',
-                                                                transition: 'var(--transition-smooth)'
-                                                              }}
-                                                              onMouseEnter={(e) => {
-                                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                                setTooltip({
-                                                                  text: issue.subject,
-                                                                  x: e.clientX,
-                                                                  y: e.clientY
-                                                                });
-                                                                // 호버 효과 추가
-                                                                e.currentTarget.style.transform = 'var(--card-hover-transform)';
-                                                                e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
-                                                                e.currentTarget.style.borderColor = 'var(--accent-border)';
-                                                              }}
-                                                              onMouseLeave={(e) => {
-                                                                setTooltip(null);
-                                                                // 호버 효과 제거
-                                                                e.currentTarget.style.transform = 'translateY(0)';
-                                                                e.currentTarget.style.boxShadow = 'var(--shadow-card)';
-                                                                e.currentTarget.style.borderColor = borderColor;
-                                                              }}
-                                                              onClick={() => {
-                                                                setSelectedIssue(issue);
-                                                                setIsModalOpen(true);
-                                                              }}
-                                                            >
-                                                              <div style={{ 
-                                                                background: issue.is_closed === 1 ? '#4CAF50' : '#FF6B6B',
-                                                                color: 'white',
-                                                                padding: '4px 8px',
-                                                                borderRadius: '6px',
-                                                                fontWeight: 600,
-                                                                fontSize: '0.75rem',
-                                                                minWidth: 'fit-content'
-                                                              }}>
-                                                                #{issue.redmine_id}
-                                                              </div>
-                                                              <div style={{ 
-                                                                fontSize: '0.8rem',
-                                                                color: '#333',
-                                                                fontWeight: 500,
-                                                                flex: 1,
-                                                                whiteSpace: 'nowrap',
-                                                                overflow: 'hidden',
-                                                                textOverflow: 'ellipsis'
-                                                              }}>
-                                                                {issue.subject}
-                                                              </div>
-                                                            </div>
-                                                          );
-                                                        });
-                                                      })()}
+                                            // 주차별로 반복
+                                            const weeks = [];
+                                            const startDate = new Date(dateFrom);
+                                            const endDate = new Date(dateTo);
+                                            
+                                            // 첫 번째 주의 월요일 찾기
+                                            let currentDate = new Date(startDate);
+                                            const dayOfWeek = currentDate.getDay();
+                                            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                                            currentDate.setDate(currentDate.getDate() - daysToMonday);
+                                            
+                                            while (currentDate <= endDate) {
+                                              const weekStart = new Date(currentDate);
+                                              const weekEnd = new Date(currentDate);
+                                              weekEnd.setDate(weekEnd.getDate() + 6);
+                                              
+                                              weeks.push({
+                                                start: new Date(weekStart),
+                                                end: new Date(weekEnd)
+                                              });
+                                              
+                                              currentDate.setDate(currentDate.getDate() + 7);
+                                            }
+                                            
+                                            const result: any[] = [];
+                                            
+                                            // 각 주차별로 헤더와 본문 반복
+                                            weeks.forEach((week, weekIndex) => {
+                                                                                             // 주차 헤더 추가
+                                               result.push(
+                                                 <tr key={`week-header-${weekIndex}`}>
+                                                   <th style={{ 
+                                                     padding: '8px', 
+                                                     border: '1px solid #ddd', 
+                                                     background: '#f5f5f5',
+                                                     width: '120px',
+                                                     textAlign: 'center',
+                                                     fontSize: '0.9rem',
+                                                     fontWeight: 600,
+                                                     color: '#333'
+                                                   }}>
+                                                     {week.start.getMonth() + 1}월 {Math.ceil((week.start.getDate() + week.start.getDay()) / 7)}주차
+                                                   </th>
+                                                   {(() => {
+                                                     const weekDates = [];
+                                                     const weekStart = new Date(week.start);
+                                                     const weekEnd = new Date(week.start);
+                                                     weekEnd.setDate(weekEnd.getDate() + 6);
+                                                     
+                                                     for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+                                                       weekDates.push(new Date(d));
+                                                     }
+                                                     
+                                                     return weekDates.map((date, dateIndex) => {
+                                                       const isWeekend = date.getDay() === 0 || date.getDay() === 6; // 일요일(0) 또는 토요일(6)
+                                                       
+                                                       return (
+                                                         <th key={dateIndex} style={{ 
+                                                           padding: '8px', 
+                                                           border: '1px solid #ddd', 
+                                                           background: '#f5f5f5',
+                                                           width: '120px',
+                                                           textAlign: 'center',
+                                                           fontSize: '0.9rem',
+                                                           fontWeight: 600,
+                                                           color: isWeekend ? '#ff0000' : '#333'
+                                                         }}>
+                                                           {date.getDate()}
+                                                         </th>
+                                                       );
+                                                     });
+                                                   })()}
+                                                 </tr>
+                                               );
+                                              
+                                              
+                                              
+                                              // 본문 데이터 추가
+                                              Object.keys(products).forEach((product, productIndex) => {
+                                                // 선택된 설비군이 있으면 해당 설비군만 표시
+                                                if (selectedMemberEquipment && selectedMemberEquipment !== product) {
+                                                  return;
+                                                }
+                                                
+                                                result.push(
+                                                  <tr key={`${weekIndex}-${productIndex}`}>
+                                                    <td style={{ 
+                                                      padding: '8px', 
+                                                      border: '1px solid #ddd', 
+                                                      background: selectedMemberEquipment === product ? '#e3f2fd' : '#f9f9f9',
+                                                      fontWeight: 600,
+                                                      cursor: 'pointer',
+                                                      transition: 'all 0.2s ease'
+                                                    }}
+                                                      onClick={() => setSelectedMemberEquipment(selectedMemberEquipment === product ? null : product)}
+                                                      onMouseEnter={(e) => {
+                                                        if (!selectedMemberEquipment || selectedMemberEquipment !== product) {
+                                                          e.currentTarget.style.background = '#e8f4fd';
+                                                        }
+                                                      }}
+                                                      onMouseLeave={(e) => {
+                                                        if (!selectedMemberEquipment || selectedMemberEquipment !== product) {
+                                                          e.currentTarget.style.background = '#f9f9f9';
+                                                        }
+                                                      }}
+                                                    >
+                                                      {product}
                                                     </td>
-                                                  ));
-                                                })()}
-                                              </tr>
-                                            ));
+                                                    {(() => {
+                                                      const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+                                                      const weekendIndices = [5, 6]; // 토요일(5), 일요일(6)
+                                                      
+                                                      return dayNames.map((dayName, index) => {
+                                                        const isWeekend = weekendIndices.includes(index);
+                                                        
+                                                        // 현재 주차의 해당 요일 날짜 계산
+                                                        const currentDate = new Date(week.start);
+                                                        currentDate.setDate(currentDate.getDate() + index);
+                                                        
+                                                        return (
+                                                          <td key={index} style={{ 
+                                                            padding: '4px', 
+                                                            border: '1px solid #ddd',
+                                                            verticalAlign: 'top',
+                                                            minHeight: '60px',
+                                                            background: isWeekend ? '#fafafa' : '#fff'
+                                                          }}>
+                                                            {(() => {
+                                                              // 해당 날짜와 product에 맞는 일감들 필터링 (생성일 기준)
+                                                              const dayIssues = products[product].filter((issue: any) => {
+                                                                const issueDate = new Date(issue.created_date);
+                                                                const issueYear = issueDate.getFullYear();
+                                                                const issueMonth = issueDate.getMonth();
+                                                                const issueDay = issueDate.getDate();
+                                                                
+                                                                const currentYear = currentDate.getFullYear();
+                                                                const currentMonth = currentDate.getMonth();
+                                                                const currentDay = currentDate.getDate();
+                                                                
+                                                                return issueYear === currentYear && issueMonth === currentMonth && issueDay === currentDay;
+                                                              });
+                                                              
+                                                              return dayIssues.map((issue: any, issueIndex: number) => {
+                                                                // tracker_name에 따른 색상 결정
+                                                                let cardColor = '#e3f2fd'; // 기본 파란색
+                                                                let borderColor = '#bbdefb';
+                                                                
+                                                                if (issue.tracker_name.includes('HW')) {
+                                                                  cardColor = '#ffebee'; // 연한 빨간색
+                                                                  borderColor = '#ffcdd2';
+                                                                } else if (issue.tracker_name.includes('SW')) {
+                                                                  cardColor = '#e8f5e8'; // 연한 초록색
+                                                                  borderColor = '#c8e6c9';
+                                                                } else if (issue.tracker_name.includes('Setup')) {
+                                                                  cardColor = '#f3e5f5'; // 연한 보라색
+                                                                  borderColor = '#e1bee7';
+                                                                } else if (issue.tracker_name.includes('확산')) {
+                                                                  cardColor = '#f5f5f5'; // 연한 회색
+                                                                  borderColor = '#e0e0e0';
+                                                                }
+                                                                
+                                                                return (
+                                                                  <div 
+                                                                    key={issueIndex} 
+                                                                    style={{
+                                                                      background: cardColor,
+                                                                      padding: '8px 12px',
+                                                                      margin: '4px 0',
+                                                                      borderRadius: 'var(--border-radius-card)',
+                                                                      fontSize: '0.8rem',
+                                                                      border: `1px solid ${borderColor}`,
+                                                                      boxShadow: 'var(--shadow-card)',
+                                                                      display: 'flex',
+                                                                      alignItems: 'center',
+                                                                      gap: '8px',
+                                                                      cursor: 'pointer',
+                                                                      transition: 'var(--transition-smooth)'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                      const rect = e.currentTarget.getBoundingClientRect();
+                                                                      setTooltip({
+                                                                        text: issue.subject,
+                                                                        x: e.clientX,
+                                                                        y: e.clientY
+                                                                      });
+                                                                      // 호버 효과 추가
+                                                                      e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                                                      e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                                                      e.currentTarget.style.borderColor = 'var(--accent-border)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                      setTooltip(null);
+                                                                      // 호버 효과 제거
+                                                                      e.currentTarget.style.transform = 'translateY(0)';
+                                                                      e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                                                      e.currentTarget.style.borderColor = borderColor;
+                                                                    }}
+                                                                    onClick={() => {
+                                                                      setSelectedIssue(issue);
+                                                                      setIsModalOpen(true);
+                                                                    }}
+                                                                  >
+                                                                    <div style={{ 
+                                                                      background: issue.is_closed === 1 ? '#4CAF50' : '#FF6B6B',
+                                                                      color: 'white',
+                                                                      padding: '4px 8px',
+                                                                      borderRadius: '6px',
+                                                                      fontWeight: 600,
+                                                                      fontSize: '0.75rem',
+                                                                      minWidth: 'fit-content'
+                                                                    }}>
+                                                                      #{issue.redmine_id}
+                                                                    </div>
+                                                                    <div style={{ 
+                                                                      fontSize: '0.8rem',
+                                                                      color: '#333',
+                                                                      fontWeight: 500,
+                                                                      flex: 1,
+                                                                      whiteSpace: 'nowrap',
+                                                                      overflow: 'hidden',
+                                                                      textOverflow: 'ellipsis'
+                                                                    }}>
+                                                                      {issue.subject}
+                                                                    </div>
+                                                                  </div>
+                                                                );
+                                                              });
+                                                            })()}
+                                                          </td>
+                                                        );
+                                                      });
+                                                    })()}
+                                                  </tr>
+                                                );
+                                              });
+                                            });
+                                            
+                                            return result;
                                           })()}
                                         </tbody>
                                       </table>
@@ -3495,7 +3611,637 @@ export default function IssuesPage() {
               ) : '검색 조건을 설정해주세요'
             )}
             {activeView === 'sw' && (
-              selectedProducts.length > 0 ? 'SW 분석 내용이 여기에 표시됩니다.' : '검색 조건을 설정해주세요'
+              selectedProducts.length > 0 ? (
+                issueData ? (
+                  <div style={{ width: '100%', minHeight: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 24 }}>
+                      {issueData.blocks && issueData.blocks.map((block: any, index: number) => {
+                        switch (block.type) {
+                          case 'sw_overview':
+                            return (
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)' }}>
+                                <div style={{ display: 'flex', gap: 16 }}>
+                                  <div style={{ 
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: '#282c34',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{ 
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      발생 건수
+                                    </span>
+                                    
+                                    <span style={{ 
+                                      fontSize: '3.5rem', 
+                                      fontWeight: 800, 
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data.total_sw_issues}
+                                    </span>
+                                    
+                                    <div style={{ 
+                                      fontSize: '0.9rem',
+                                      color: 'rgba(255,255,255,0.95)',
+                                      fontWeight: 500,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                    }}>
+                                      대상 설비군 : {Object.keys(block.data.equipment_summary || {}).filter(equipment => block.data.equipment_summary[equipment].sw > 0).length}
+                                    </div>
+                                  </div>
+
+                                  <div style={{ 
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: block.data.sw_ratio > 30 ? '#d32f2f' : 
+                                               block.data.sw_ratio <= 5 ? '#1b5e20' : '#FFC107',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{ 
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      발생율
+                                    </span>
+                                    
+                                    <span style={{ 
+                                      fontSize: '3.5rem', 
+                                      fontWeight: 800, 
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data.sw_ratio}%
+                                    </span>
+                                    
+                                    <div style={{ 
+                                      fontSize: '0.9rem',
+                                      color: 'rgba(255,255,255,0.95)',
+                                      fontWeight: 500,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                    }}>
+                                      전체 일감 : {block.data.total_all_issues}
+                                    </div>
+                                  </div>
+
+                                  <div style={{ 
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '24px',
+                                    background: block.data.completion_rate <= 50 ? '#d32f2f' : 
+                                               block.data.completion_rate <= 80 ? '#FFC107' : '#1b5e20',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    boxShadow: 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                  }}>
+                                    <span style={{ 
+                                      position: 'absolute',
+                                      top: '16px',
+                                      left: '16px',
+                                      fontSize: '0.85rem',
+                                      color: 'rgba(255,255,255,0.9)',
+                                      fontWeight: 600,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      완료율
+                                    </span>
+                                    
+                                    <span style={{ 
+                                      fontSize: '3.5rem', 
+                                      fontWeight: 800, 
+                                      color: '#fff',
+                                      marginTop: '24px',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                      letterSpacing: '-1px'
+                                    }}>
+                                      {block.data.completion_rate}%
+                                    </span>
+                                    
+                                    <div style={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center',
+                                      gap: '16px',
+                                      fontSize: '0.9rem',
+                                      color: 'rgba(255,255,255,0.95)',
+                                      fontWeight: 500,
+                                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                    }}>
+                                      <span>진행 : {block.data.total_sw_issues - Math.round(block.data.total_sw_issues * block.data.completion_rate / 100)}</span>
+                                      <span>완료 : {Math.round(block.data.total_sw_issues * block.data.completion_rate / 100)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* 설비군 버튼들 */}
+                                <div style={{ 
+                                  marginTop: '24px',
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
+                                  gap: '12px',
+                                  justifyContent: 'flex-start'
+                                }}>
+                                  {block.data.equipment_summary && Object.keys(block.data.equipment_summary).filter(equipment => block.data.equipment_summary[equipment].sw > 0).map((equipment: string, index: number) => (
+                                    <button
+                                      key={index}
+                                      style={{
+                                        padding: 'var(--padding-card)',
+                                        background: (() => {
+                                          if (selectedEquipment === equipment) {
+                                            return 'var(--selected-bg)';
+                                          } else if (block.data.equipment_summary[equipment].sw_completion_rate === 0) {
+                                            return 'var(--completion-0)';
+                                          } else if (block.data.equipment_summary[equipment].sw_completion_rate <= 30) {
+                                            return 'var(--completion-low)';
+                                          } else if (block.data.equipment_summary[equipment].sw_completion_rate <= 60) {
+                                            return 'var(--completion-medium)';
+                                          } else if (block.data.equipment_summary[equipment].sw_completion_rate < 100) {
+                                            return 'var(--completion-high)';
+                                          } else {
+                                            return 'var(--completion-100)';
+                                          }
+                                        })(),
+                                        border: selectedEquipment === equipment ? 'var(--selected-border)' : '1px solid var(--border-darker)',
+                                        borderRadius: 'var(--border-radius-card)',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 600,
+                                        color: selectedEquipment === equipment ? 'var(--accent-color)' : 'var(--text-white)',
+                                        cursor: 'pointer',
+                                        transition: 'var(--transition-smooth)',
+                                        minWidth: '120px',
+                                        flex: '1 1 0',
+                                        textAlign: 'center',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '4px',
+                                        boxShadow: selectedEquipment === equipment ? 'var(--selected-shadow)' : 'var(--shadow-card)'
+                                      }}
+                                      onClick={() => {
+                                        setSelectedEquipment(selectedEquipment === equipment ? null : equipment);
+                                        setSelectedSWProject(null); // 호기명 선택 초기화
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (selectedEquipment !== equipment) {
+                                          e.currentTarget.style.background = 'var(--button-hover-bg)';
+                                          e.currentTarget.style.borderColor = 'var(--button-hover-border)';
+                                          e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                          e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (selectedEquipment !== equipment) {
+                                          const completionRate = block.data.equipment_summary[equipment].sw_completion_rate;
+                                          const originalColor = (() => {
+                                            if (completionRate === 0) {
+                                              return 'var(--completion-0)';
+                                            } else if (completionRate <= 30) {
+                                              return 'var(--completion-low)';
+                                            } else if (completionRate <= 60) {
+                                              return 'var(--completion-medium)';
+                                            } else if (completionRate < 100) {
+                                              return 'var(--completion-high)';
+                                            } else {
+                                              return 'var(--completion-100)';
+                                            }
+                                          })();
+                                          e.currentTarget.style.background = originalColor;
+                                          e.currentTarget.style.borderColor = 'var(--border-darker)';
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                        }
+                                      }}
+                                    >
+                                      <span>{equipment}</span>
+                                      <span style={{ 
+                                        fontSize: '0.75rem', 
+                                        color: '#6c757d',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 0
+                                      }}>
+                                        <span style={{ color: '#FF0000', display: 'block' }}>발생 건수: {block.data.equipment_summary[equipment].sw}</span>
+                                        <span style={{ color: '#1b5e20', display: 'block' }}>발생율: {block.data.equipment_summary[equipment].sw_ratio}%</span>
+                                        <span style={{ color: '#1976d2', display: 'block' }}>완료율: {block.data.equipment_summary[equipment].sw_completion_rate}%</span>
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          case 'sw_summary':
+                            return (
+                              <div key={index} style={{ background: 'var(--dark-card-bg)', padding: 'var(--padding-panel)', borderRadius: 'var(--border-radius-panel)', border: '1px solid var(--border-dark)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                  <h4 style={{ margin: '0 0 16px 0', color: '#222', fontSize: '1.2rem' }}>SW 이슈 타임 테이블</h4>
+                                  {selectedEquipment && block.data[selectedEquipment] ? (
+                                    <div style={{ overflowX: 'auto' }}>
+                                      <table style={{ 
+                                        width: '100%', 
+                                        borderCollapse: 'collapse',
+                                        fontSize: '0.85rem',
+                                        tableLayout: 'fixed'
+                                      }}>
+                                        <thead>
+                                          <tr>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px'
+                                            }}>
+                                              프로젝트 ID
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#333'
+                                            }}>
+                                              월
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#333'
+                                            }}>
+                                              화
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#333'
+                                            }}>
+                                              수
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#333'
+                                            }}>
+                                              목
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#333'
+                                            }}>
+                                              금
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#ff0000'
+                                            }}>
+                                              토
+                                            </th>
+                                            <th style={{ 
+                                              padding: '8px', 
+                                              border: '1px solid #ddd', 
+                                              background: '#f5f5f5',
+                                              width: '120px',
+                                              textAlign: 'center',
+                                              fontSize: '0.9rem',
+                                              fontWeight: 600,
+                                              color: '#ff0000'
+                                            }}>
+                                              일
+                                            </th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {(() => {
+                                            const result: any[] = [];
+                                            
+                                            // 주차 계산
+                                            const weeks = [];
+                                            const startDate = new Date(dateFrom);
+                                            const endDate = new Date(dateTo);
+                                            
+                                            // 첫 번째 주의 월요일부터 시작
+                                            const firstMonday = new Date(startDate);
+                                            const dayOfWeek = startDate.getDay();
+                                            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 일요일이면 6일 전, 아니면 dayOfWeek-1일 전
+                                            firstMonday.setDate(startDate.getDate() - daysToMonday);
+                                            
+                                            let currentWeekStart = new Date(firstMonday);
+                                            
+                                            while (currentWeekStart <= endDate) {
+                                              const weekEnd = new Date(currentWeekStart);
+                                              weekEnd.setDate(currentWeekStart.getDate() + 6);
+                                              
+                                              weeks.push({
+                                                start: new Date(currentWeekStart),
+                                                end: weekEnd
+                                              });
+                                              
+                                              currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+                                            }
+                                            
+                                            // 각 주차별로 데이터 생성
+                                            weeks.forEach((week, weekIndex) => {
+                                              // 주차 헤더 (예: "8월 1주차"와 날짜들)
+                                              result.push(
+                                                <tr key={`week-header-${weekIndex}`}>
+                                                  <th style={{ 
+                                                    padding: '8px', 
+                                                    border: '1px solid #ddd', 
+                                                    background: '#f5f5f5',
+                                                    width: '120px',
+                                                    textAlign: 'center',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600,
+                                                    color: '#333'
+                                                  }}>
+                                                    {week.start.getMonth() + 1}월 {Math.ceil((week.start.getDate() + week.start.getDay()) / 7)}주차
+                                                  </th>
+                                                  {(() => {
+                                                    const weekDates = [];
+                                                    const weekStart = new Date(week.start);
+                                                    const weekEnd = new Date(week.start);
+                                                    weekEnd.setDate(weekEnd.getDate() + 6);
+                                                    for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
+                                                      weekDates.push(new Date(d));
+                                                    }
+                                                    return weekDates.map((date, dateIndex) => {
+                                                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                                      const isOutsideRange = date < new Date(dateFrom) || date > new Date(dateTo);
+                                                      
+                                                      return (
+                                                        <th key={dateIndex} style={{ 
+                                                          padding: '8px', 
+                                                          border: '1px solid #ddd', 
+                                                          background: '#f5f5f5',
+                                                          width: '120px',
+                                                          textAlign: 'center',
+                                                          fontSize: '0.9rem',
+                                                          fontWeight: 600,
+                                                          color: isWeekend ? '#ff0000' : '#333'
+                                                        }}>
+                                                          {date.getDate()}
+                                                        </th>
+                                                      );
+                                                    });
+                                                  })()}
+                                                </tr>
+                                              );
+                                              
+                                              // 각 프로젝트별 행
+                                              Object.keys(block.data[selectedEquipment].project_groups).forEach((projectId, projectIndex) => {
+                                                // 선택된 호기명이 있으면 해당 호기명만 표시
+                                                if (selectedSWProject && selectedSWProject !== projectId) {
+                                                  return;
+                                                }
+                                                result.push(
+                                                  <tr key={`${weekIndex}-${projectIndex}`}>
+                                                    <td style={{ 
+                                                      padding: '8px', 
+                                                      border: '1px solid #ddd', 
+                                                      background: selectedSWProject === projectId ? '#e3f2fd' : '#f9f9f9',
+                                                      fontWeight: 600,
+                                                      cursor: 'pointer',
+                                                      transition: 'all 0.2s ease'
+                                                    }}
+                                                      onClick={() => setSelectedSWProject(selectedSWProject === projectId ? null : projectId)}
+                                                      onMouseEnter={(e) => {
+                                                        if (!selectedSWProject || selectedSWProject !== projectId) {
+                                                          e.currentTarget.style.background = '#e8f4fd';
+                                                        }
+                                                      }}
+                                                      onMouseLeave={(e) => {
+                                                        if (!selectedSWProject || selectedSWProject !== projectId) {
+                                                          e.currentTarget.style.background = '#f9f9f9';
+                                                        }
+                                                      }}
+                                                      dangerouslySetInnerHTML={{ 
+                                                        __html: block.data[selectedEquipment].project_groups[projectId].project_name 
+                                                      }}
+                                                    />
+                                                    {(() => {
+                                                      const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+                                                      const weekendIndices = [5, 6];
+                                                      return dayNames.map((dayName, index) => {
+                                                        const isWeekend = weekendIndices.includes(index);
+                                                        const currentDate = new Date(week.start);
+                                                        currentDate.setDate(currentDate.getDate() + index);
+                                                        const isOutsideRange = currentDate < new Date(dateFrom) || currentDate > new Date(dateTo);
+                                                        
+                                                        return (
+                                                          <td key={index} style={{ 
+                                                            padding: '4px', 
+                                                            border: '1px solid #ddd',
+                                                            verticalAlign: 'top',
+                                                            minHeight: '60px',
+                                                            background: isWeekend ? '#fafafa' : '#fff'
+                                                          }}>
+                                                            {(() => {
+                                                              // 해당 날짜와 project ID에 맞는 SW 이슈들 필터링
+                                                              const dayIssues = block.data[selectedEquipment].project_groups[projectId].sw_issues.filter((issue: any) => {
+                                                                const issueDate = new Date(issue.created_on);
+                                                                const issueYear = issueDate.getFullYear();
+                                                                const issueMonth = issueDate.getMonth();
+                                                                const issueDay = issueDate.getDate();
+                                                                
+                                                                const currentYear = currentDate.getFullYear();
+                                                                const currentMonth = currentDate.getMonth();
+                                                                const currentDay = currentDate.getDate();
+                                                                
+                                                                return issueYear === currentYear && issueMonth === currentMonth && issueDay === currentDay;
+                                                              });
+                                                              
+                                                              return dayIssues.map((issue: any, issueIndex: number) => {
+                                                                return (
+                                                                  <div 
+                                                                    key={issueIndex} 
+                                                                    style={{
+                                                                      background: '#e8f5e8',
+                                                                      padding: '8px 12px',
+                                                                      margin: '4px 0',
+                                                                      borderRadius: 'var(--border-radius-card)',
+                                                                      fontSize: '0.8rem',
+                                                                      border: '1px solid #c8e6c9',
+                                                                      boxShadow: 'var(--shadow-card)',
+                                                                      display: 'flex',
+                                                                      alignItems: 'center',
+                                                                      gap: '8px',
+                                                                      cursor: 'pointer',
+                                                                      transition: 'var(--transition-smooth)'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                      setTooltip({
+                                                                        text: issue.subject,
+                                                                        x: e.clientX,
+                                                                        y: e.clientY
+                                                                      });
+                                                                      e.currentTarget.style.transform = 'var(--card-hover-transform)';
+                                                                      e.currentTarget.style.boxShadow = 'var(--card-hover-shadow)';
+                                                                      e.currentTarget.style.borderColor = 'var(--accent-border)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                      setTooltip(null);
+                                                                      e.currentTarget.style.transform = 'translateY(0)';
+                                                                      e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+                                                                      e.currentTarget.style.borderColor = '#c8e6c9';
+                                                                    }}
+                                                                    onClick={() => {
+                                                                      setSelectedIssue(issue);
+                                                                      setIsModalOpen(true);
+                                                                    }}
+                                                                  >
+                                                                    <div style={{ 
+                                                                      background: issue.is_closed === 1 ? '#4CAF50' : '#FF6B6B',
+                                                                      color: 'white',
+                                                                      padding: '4px 8px',
+                                                                      borderRadius: '6px',
+                                                                      fontWeight: 600,
+                                                                      fontSize: '0.75rem',
+                                                                      minWidth: 'fit-content'
+                                                                    }}>
+                                                                      #{issue.redmine_id}
+                                                                    </div>
+                                                                    <div style={{ 
+                                                                      fontSize: '0.8rem',
+                                                                      color: '#333',
+                                                                      fontWeight: 500,
+                                                                      flex: 1,
+                                                                      whiteSpace: 'nowrap',
+                                                                      overflow: 'hidden',
+                                                                      textOverflow: 'ellipsis'
+                                                                    }}>
+                                                                      {issue.subject}
+                                                                    </div>
+                                                                  </div>
+                                                                );
+                                                              });
+                                                            })()}
+                                                          </td>
+                                                        );
+                                                      });
+                                                    })()}
+                                                  </tr>
+                                                );
+                                              });
+                                            });
+                                            
+                                            return result;
+                                          })()}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                      상단에서 설비군을 선택해주세요.
+                                    </div>
+                                  )}
+                                  
+                                  {/* 커스텀 툴팁 */}
+                                  {tooltip && (
+                                    <div style={{
+                                      position: 'fixed',
+                                      left: tooltip.x + 10,
+                                      top: tooltip.y - 30,
+                                      background: '#333',
+                                      color: '#fff',
+                                      padding: '8px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.85rem',
+                                      zIndex: 9999,
+                                      maxWidth: '300px',
+                                      wordWrap: 'break-word',
+                                      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                      pointerEvents: 'none'
+                                    }}>
+                                      {tooltip.text}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </div>
+                  </div>
+                ) : '데이터 로딩 중...'
+              ) : '검색 조건을 설정해주세요'
             )}
           </div>
         </div>

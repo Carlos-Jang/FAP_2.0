@@ -1183,6 +1183,149 @@ def get_hw_overview_summary(issues: List[Dict]) -> Dict: # 수정 불가
         "equipment_summary": equipment_summary
     }
 
+def get_sw_overview_summary(issues: List[Dict]) -> Dict:
+    """SW 이슈 전체 요약 정보 생성 헬퍼 함수"""
+    # SW 이슈만 필터링
+    sw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] SW Part']
+    
+    if not sw_issues:
+        return {
+            "total_sw_issues": 0,
+            "total_equipment": 0,
+            "completion_rate": 0,
+            "equipment_summary": {}
+        }
+    
+    # 전체 SW 이슈 통계
+    total_sw_issues = len(sw_issues)
+    completed_sw_issues = sum(1 for issue in sw_issues if issue.get('is_closed') == 1)
+    completion_rate = round((completed_sw_issues / total_sw_issues * 100), 1) if total_sw_issues > 0 else 0
+    
+    # 설비군별 전체 이슈 vs SW 이슈 비교
+    equipment_summary = {}
+    
+    # 모든 이슈를 설비군별로 그룹화
+    all_equipment_issues = {}
+    for issue in issues:
+        product_name = issue.get('product', 'Unknown')
+        if product_name not in all_equipment_issues:
+            all_equipment_issues[product_name] = []
+        all_equipment_issues[product_name].append(issue)
+    
+    # SW 이슈를 설비군별로 그룹화
+    sw_equipment_issues = {}
+    for issue in sw_issues:
+        product_name = issue.get('product', 'Unknown')
+        if product_name not in sw_equipment_issues:
+            sw_equipment_issues[product_name] = []
+        sw_equipment_issues[product_name].append(issue)
+    
+    # 설비군별 요약 정보 생성
+    for equipment in all_equipment_issues.keys():
+        total_issues = len(all_equipment_issues[equipment])
+        sw_issues_count = len(sw_equipment_issues.get(equipment, []))
+        sw_ratio = round((sw_issues_count / total_issues * 100), 1) if total_issues > 0 else 0
+        
+        # SW 이슈 중 완료된 것 계산
+        completed_sw = sum(1 for issue in sw_equipment_issues.get(equipment, []) if issue.get('is_closed') == 1)
+        sw_completion_rate = round((completed_sw / sw_issues_count * 100), 1) if sw_issues_count > 0 else 0
+        
+        equipment_summary[equipment] = {
+            "total": total_issues,
+            "sw": sw_issues_count,
+            "sw_ratio": sw_ratio,
+            "sw_completion_rate": sw_completion_rate
+        }
+    
+    # 전체 이슈 대비 SW 이슈 비율 계산
+    total_all_issues = len(issues)
+    sw_ratio = round((total_sw_issues / total_all_issues * 100), 1) if total_all_issues > 0 else 0
+    
+    return {
+        "total_sw_issues": total_sw_issues,
+        "total_all_issues": total_all_issues,
+        "sw_ratio": sw_ratio,
+        "completion_rate": completion_rate,
+        "equipment_summary": equipment_summary
+    }
+
+def get_sw_detail_analysis(issues: List[Dict]) -> Dict:
+    """SW 이슈 상세 분석 헬퍼 함수"""
+    # SW 이슈만 필터링
+    sw_issues = [issue for issue in issues if issue.get('tracker_name') == '[AE][이슈] SW Part']
+    
+    if not sw_issues:
+        return {}
+    
+    # 설비군별로 그룹화
+    equipment_analysis = {}
+    
+    for issue in sw_issues:
+        product_name = issue.get('product', 'Unknown')
+        
+        # 설비군별 데이터 초기화
+        if product_name not in equipment_analysis:
+            equipment_analysis[product_name] = {
+                'total_sw_issues': 0,
+                'project_groups': {}
+            }
+        
+        equipment_analysis[product_name]['total_sw_issues'] += 1
+        
+        # Project ID로 그룹화
+        project_id = issue.get('project_id', 'Unknown')
+        
+        # Project ID별 그룹 초기화
+        if project_id not in equipment_analysis[product_name]['project_groups']:
+            # 프로젝트 이름에서 #태그 뒷부분만 추출하고 첫 번째 단어를 파란색으로 처리
+            original_project_name = issue.get('project_name', '')
+            processed_project_name = original_project_name
+            
+            # #숫자 패턴 이후부터 추출
+            import re
+            match = re.search(r'#\d+\s*(.+)', original_project_name)
+            if match:
+                processed_project_name = match.group(1).strip()
+            
+            # 첫 번째 단어는 파란색, 두 번째 단어는 엔터, 그 이후는 그대로
+            if processed_project_name:
+                words = processed_project_name.split()
+                if len(words) >= 1:
+                    first_word = f'<span style="color: #007bff; font-weight: 600;">{words[0]}</span>'
+                    if len(words) >= 2:
+                        second_word = f'<br/>{words[1]}'
+                        remaining_words = ' '.join(words[2:]) if len(words) > 2 else ''
+                        processed_project_name = f'{first_word}{second_word} {remaining_words}'.strip()
+                    else:
+                        processed_project_name = first_word
+                else:
+                    processed_project_name = ''
+            
+            equipment_analysis[product_name]['project_groups'][project_id] = {
+                'total_issues': 0,
+                'project_name': processed_project_name,
+                'sw_issues': []
+            }
+        
+        equipment_analysis[product_name]['project_groups'][project_id]['total_issues'] += 1
+        
+        # SW 이슈 상세 정보 추가
+        issue_detail = {
+            'redmine_id': issue.get('redmine_id'),
+            'subject': issue.get('subject', ''),
+            'is_closed': issue.get('is_closed', 0),
+            'description': issue.get('description', ''),
+            'created_on': issue.get('created_on', ''),
+            'updated_on': issue.get('updated_on', ''),
+            'author_name': issue.get('author_name', ''),
+            'status': issue.get('status', ''),
+            'project_id': project_id,
+            'project_name': issue.get('project_name', '')
+        }
+        equipment_analysis[product_name]['project_groups'][project_id]['sw_issues'].append(issue_detail)
+    
+    return equipment_analysis
+
 router = APIRouter(prefix="/api/issues", tags=["issues"])
 
 @router.post("/sync")
@@ -1954,13 +2097,56 @@ async def get_sw_data(request: Request):
 
         if not all([start_date, end_date, site_indexes, sub_site_names, product_names]):
             raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: start_date, end_date, site_indexes, sub_site_names, product_names")
+        # 선택된 리스트들 로그 출력
+        
+        # 모든 선택된 항목들의 프로젝트 ID 리스트 수집
+        all_project_ids = []
+        
+        for site_index in site_indexes:
+            for sub_site_name in sub_site_names:
+                for product_name in product_names:
+                    # 헬퍼 함수 호출하여 프로젝트 ID 리스트 가져오기
+                    project_ids = get_issue_project_ids(site_index, sub_site_name, product_name)
+                    all_project_ids.extend(project_ids)
+        
+        # 중복 제거
+        all_project_ids = list(set(all_project_ids))
+        
+        # project_ids와 기간을 가지고 이슈 데이터 조회
+        db = DatabaseManager()
+        issues = db.get_issues_by_filter(start_date, end_date, all_project_ids)
+        
+        # SW 데이터 분석
+        sw_overview_summary = get_sw_overview_summary(issues)
+        sw_detail_analysis = get_sw_detail_analysis(issues)
+        
 
-        # TODO: SW 데이터 로직 구현
-        pass
+        # 블럭 리스트 초기화
+        blocks = []
+        
+        # SW 전체 요약 블럭 추가 (먼저 표시)
+        if sw_overview_summary and sw_overview_summary['total_sw_issues'] > 0:
+            sw_overview_block = {
+                "type": "sw_overview",
+                "title": "SW 이슈 전체 요약",
+                "data": sw_overview_summary
+            }
+            blocks.append(sw_overview_block)
+        
+        # SW 설비군별 분석 블럭 추가
+        if sw_detail_analysis:
+            sw_summary_block = {
+                "type": "sw_summary",
+                "title": "SW 설비군별 분석",
+                "data": sw_detail_analysis
+            }
+            blocks.append(sw_summary_block)
 
         return {
             "success": True,
-            "data": {}
+            "data": {
+                "blocks": blocks
+            }
         }
             
     except HTTPException:
