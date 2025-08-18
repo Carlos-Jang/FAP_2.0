@@ -1,56 +1,29 @@
 """
 FAP 2.0 - 데이터베이스 관리 클래스 (백엔드)
 
-핵심 역할:
-- FAP 2.0의 로컬 데이터 저장소를 담당하는 데이터베이스 관리자
-- PMS 서버에서 받아온 데이터를 로컬 MariaDB에 저장 및 관리
-- 관리자 수동 동기화를 통한 배치 데이터 처리
-- 저장된 데이터를 기반으로 한 분석 및 조회 기능 제공
-
 주요 기능:
 - 데이터베이스 연결 관리: MariaDB 연결 설정 및 연결 풀 관리
-- 일감(Issue) 데이터 관리: PMS에서 받아온 일감 데이터 저장/조회/분석
-- 프로젝트 데이터 관리: 프로젝트 정보 및 계층 구조 저장/관리
+- 로드맵 데이터 관리: 로드맵 정보 저장/조회/분석
+- 이슈 데이터 관리: 이슈 정보 저장/조회/분석
 - 사용자 API 키 관리: 암호화/복호화, 개인별 키 저장 및 검증
 - PMS 데이터 동기화: 관리자 수동 실행으로 대량 데이터 동기화
-- 성능 최적화: 병렬 처리, 배치 처리, 연결 풀링
-
-데이터 동기화 특징:
-- 실시간이 아닌 관리자 수동 동기화 방식
-- PMS 서버에서 대량 데이터를 받아와 로컬 DB에 저장
-- 배치 처리로 효율적인 대량 데이터 처리
-- 저장된 데이터를 기반으로 분석 및 조회 수행
-
-보안 기능:
-- API 키 암호화: 사용자 개인 API 키 안전한 저장
-- 데이터 검증: 입력 데이터 유효성 검사 및 검증
-- 연결 보안: 데이터베이스 연결 보안 설정
-
-성능 최적화:
-- 병렬 처리: 여러 API 요청을 동시에 처리
-- 배치 처리: 대량 데이터 처리 시 효율성 향상
-- 연결 풀링: 데이터베이스 연결 재사용
-- 캐싱: 자주 사용되는 데이터 캐싱
 
 데이터 구조:
-- 일감 테이블: redmine_id, raw_data, created_at, updated_at
-- 프로젝트 테이블: redmine_id, raw_data, children_ids, level
+- 로드맵 테이블: 로드맵 정보 및 연결된 이슈 ID
+- 이슈 테이블: 이슈 상세 정보 및 상태
 - 사용자 API 키 테이블: login, encrypted_api_key, created_at
-- 이슈 상태 테이블: status_id, status_name, is_closed
 
-PMS 연동:
-- PMS 서버 API: 일감, 프로젝트, 상태 정보 대량 조회
-- 관리자 수동 동기화: 주기적/수동으로 데이터 업데이트
-- 로컬 DB 저장: 조회한 데이터를 로컬에 저장하여 활용
+기술 스택:
+- MariaDB (PyMySQL)
+- JSON 데이터 처리
+- 암호화 (Fernet)
+- Redmine API 연동
 
-에러 처리:
-- 연결 실패 처리: 데이터베이스 연결 오류 복구
-- PMS API 오류 처리: PMS 서버 호출 실패 시 재시도
-- 데이터 무결성: 트랜잭션 기반 안전한 데이터 처리
-
-Redmine Service와의 차이점:
-- DB Manager: 로컬 DB 기반, 배치 처리, 주기적 동기화, 저장된 데이터 활용
-- Redmine Service: 실시간 API 호출, 즉시 응답, 직접 통신, DB 무관
+데이터 흐름:
+1. Redmine API에서 데이터 조회
+2. 로컬 MariaDB에 저장
+3. 프론트엔드에서 조회 요청
+4. 가공된 데이터 반환
 """
 
 import pymysql
@@ -81,7 +54,6 @@ class DatabaseManager:
             conn = pymysql.connect(**self.db_config)
             return conn
         except Exception as e:
-            print(f"DB 연결 실패: {e}")
             return None
     
     def update_projects_table_structure(self) -> bool:  # 수정 불가
@@ -96,24 +68,20 @@ class DatabaseManager:
             # children_ids 컬럼이 있는지 확인
             cursor.execute("SHOW COLUMNS FROM projects LIKE 'children_ids'")
             if not cursor.fetchone():
-                print("children_ids 컬럼 추가 중...")
                 cursor.execute("ALTER TABLE projects ADD COLUMN children_ids JSON AFTER raw_data")
             
             # level 컬럼이 있는지 확인
             cursor.execute("SHOW COLUMNS FROM projects LIKE 'level'")
             if not cursor.fetchone():
-                print("level 컬럼 추가 중...")
                 cursor.execute("ALTER TABLE projects ADD COLUMN level INT DEFAULT 0 AFTER children_ids")
             
             # 기존 데이터의 level을 0으로 설정
             cursor.execute("UPDATE projects SET level = 0 WHERE level IS NULL")
             
             conn.commit()
-            print("프로젝트 테이블 구조 업데이트 완료")
             return True
             
         except Exception as e:
-            print(f"테이블 구조 업데이트 실패: {e}")
             return False
         finally:
             conn.close()
@@ -209,7 +177,7 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def get_issue_by_id(self, issue_id: int) -> Dict:
+    def get_issue_by_id(self, issue_id: int) -> Dict: # 수정 불가
         """특정 ID의 일감 정보를 조회하는 메서드"""
         conn = self.get_connection()
         if not conn:
@@ -829,181 +797,7 @@ class DatabaseManager:
         project['data'] = self._parse_issue_data(project['raw_data'])  # 일감과 동일한 방식
         return project
       
-    def sync_projects(self, limit: int = 1000) -> Dict:  # 미사용 
-        """레드마인에서 프로젝트 목록을 가져와서 DB에 저장 (50개씩 병렬 처리)"""
-        try:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            
-            # 테이블 구조 업데이트 확인
-            self.update_projects_table_structure()
-            
-            print(f"레드마인 API 병렬 호출 중... (50개씩 배치 처리)")
-            
-            # 1. 먼저 전체 프로젝트 개수 확인
-            test_url = f"{REDMINE_URL}/projects.json"
-            test_params = {'limit': 1, 'key': API_KEY}
-            test_response = requests.get(test_url, params=test_params, timeout=10)
-            
-            if test_response.status_code != 200:
-                return {
-                    'success': False,
-                    'error': f'레드마인 API 연결 실패: {test_response.status_code}',
-                    'count': 0
-                }
-            
-            # 2. 50개씩 나누어서 병렬로 API 호출
-            all_projects = []
-            batch_size = 50
-            offset = 0
-            
-            def fetch_projects_batch(batch_offset):
-                """50개씩 프로젝트를 가져오는 함수"""
-                url = f"{REDMINE_URL}/projects.json"
-                params = {
-                    'limit': batch_size,
-                    'offset': batch_offset,
-                    'key': API_KEY
-                }
-                
-                try:
-                    response = requests.get(url, params=params, timeout=30)
-                    if response.status_code == 200:
-                        data = response.json()
-                        projects = data.get('projects', [])
-                        print(f"배치 {batch_offset//batch_size + 1}: {len(projects)}개 프로젝트 가져옴")
-                        return projects
-                    else:
-                        print(f"배치 {batch_offset//batch_size + 1}: API 호출 실패 (status: {response.status_code})")
-                        return []
-                except Exception as e:
-                    print(f"배치 {batch_offset//batch_size + 1}: 에러 - {str(e)}")
-                    return []
-            
-            # 병렬로 여러 배치를 동시에 처리
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = []
-                
-                # 입력받은 limit만큼 배치 계산
-                max_batches = (limit + batch_size - 1) // batch_size  # 올림 나눗셈
-                print(f"총 {max_batches}개 배치를 처리합니다 (최대 {limit}개 프로젝트)")
-                
-                for i in range(max_batches):
-                    batch_offset = i * batch_size
-                    future = executor.submit(fetch_projects_batch, batch_offset)
-                    futures.append(future)
-                
-                # 모든 배치 결과 수집
-                for future in as_completed(futures):
-                    batch_projects = future.result()
-                    if batch_projects:
-                        all_projects.extend(batch_projects)
-                    # 빈 배치가 나와도 계속 진행 (더 많은 데이터가 있을 수 있음)
-            
-            if not all_projects:
-                return {
-                    'success': True,
-                    'message': '동기화할 프로젝트가 없습니다.',
-                    'count': 0
-                }
-            
-            print(f"총 {len(all_projects)}개 프로젝트를 가져왔습니다.")
-            
-            # 3. DB에 저장
-            conn = self.get_connection()
-            if not conn:
-                return {
-                    'success': False,
-                    'error': 'DB 연결 실패',
-                    'count': 0
-                }
-            
-            cursor = conn.cursor()
-            
-            # 기존 projects 테이블 전체 삭제
-            print("기존 프로젝트 데이터 삭제 중...")
-            cursor.execute("TRUNCATE TABLE projects")
-            
-            # 새로운 프로젝트 데이터 삽입
-            print("새로운 프로젝트 데이터 삽입 중...")
-            saved_count = 0
-            
-            for project in all_projects:
-                redmine_project_id = project.get('id')
-                project_name = project.get('name', '')
-                
-                if not redmine_project_id or not project_name:
-                    continue
-                
 
-                
-                # 하위 프로젝트 ID들 가져오기
-                children_ids = []
-                level = 1  # 기본값: 최상위 프로젝트
-                
-                # Redmine API로 하위 프로젝트 조회
-                try:
-                    children_url = f"{REDMINE_URL}/projects.json?parent_id={redmine_project_id}"
-                    children_response = requests.get(children_url, params={'key': API_KEY}, timeout=10)
-                    if children_response.status_code == 200:
-                        children_data = children_response.json()
-                        children_ids = [child.get('id') for child in children_data.get('projects', [])]
-                        
-                        # 부모 프로젝트 정보 확인
-                        parent_id = project.get('parent', {}).get('id')
-                        
-                        # 특정 프로젝트 하드코딩 레벨 설정
-                        if redmine_project_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 00. ATI 본사
-                            level = 11
-                        elif redmine_project_id == ATI_PROJECT_IDS['ATI_SAMPLE_EVALUATION']:  # ATI 시료 평가
-                            level = 21
-                        elif redmine_project_id == ATI_PROJECT_IDS['ATI_GUIDE']:  # PMS System 안내
-                            level = 31
-                        else:
-                            # 레벨 설정 로직
-                            if parent_id is None:
-                                level = 1  # 최상위 (고객사)
-                            elif parent_id == ATI_PROJECT_IDS['ATI_HEADQUARTERS']:  # 부모가 00. ATI 본사인 경우
-                                level = 12
-                            elif not children_ids:
-                                level = 4  # 최하위 (설비/라인)
-                            elif parent_id in CUSTOMER_PROJECT_IDS:
-                                level = 2  # 고객사의 직접 하위 (지역)
-                            else:
-                                level = 3  # 지역의 하위 (건물명)
-                                
-                except Exception as e:
-                    print(f"프로젝트 {redmine_project_id} 하위 프로젝트 조회 실패: {e}")
-                
-                # 새 프로젝트 추가 (7개 컬럼 모두 저장)
-                cursor.execute("""
-                    INSERT INTO projects (redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at) 
-                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                """, (
-                    redmine_project_id, 
-                    project_name, 
-                    json.dumps(project, ensure_ascii=False),
-                    json.dumps(children_ids, ensure_ascii=False),
-                    level
-                ))
-                saved_count += 1
-            
-            conn.commit()
-            conn.close()
-            
-            return {
-                'success': True,
-                'message': f'프로젝트 동기화 완료: {saved_count}개 프로젝트 저장',
-                'count': len(all_projects),
-                'saved': saved_count,
-                'updated': 0
-            }
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'프로젝트 동기화 실패: {str(e)}',
-                'count': 0
-            }
 
     def get_projects_by_ids(self, project_ids: List[int]) -> List[Dict]:  # 수정 불가
         """프로젝트 ID 리스트로 해당 프로젝트들의 전체 정보 조회"""
@@ -1511,8 +1305,7 @@ class DatabaseManager:
             updated_count = 0
             total_versions = 0
             
-            print(f"로드맵 동기화 시작 - 총 {len(CUSTOMER_PROJECT_IDS)}개 프로젝트 처리 예정")
-            print(f"처리할 프로젝트 ID들: {CUSTOMER_PROJECT_IDS}")
+
             
             # DB 연결
             conn = self.get_connection()
@@ -1526,44 +1319,30 @@ class DatabaseManager:
             
             # 기존 로드맵 데이터 모두 삭제
             cursor.execute("TRUNCATE TABLE roadmap_versions")
-            print("기존 로드맵 데이터 삭제 완료")
             
             # 각 고객사 프로젝트별로 로드맵 데이터 가져오기
             for project_id in CUSTOMER_PROJECT_IDS:
                 try:
-                    print(f"\n프로젝트 {project_id} 처리 시작...")
-                    
                     # 프로젝트 정보 가져오기
                     project_url = f"{REDMINE_URL}/projects/{project_id}.json"
                     project_response = requests.get(project_url, headers=headers, timeout=10)
                     
-                    print(f"프로젝트 {project_id} 응답 상태: {project_response.status_code}")
-                    
                     if project_response.status_code != 200:
-                        print(f"프로젝트 {project_id} 조회 실패 - 상태 코드: {project_response.status_code}")
                         continue
                     
                     project_data = project_response.json().get('project', {})
                     project_name = project_data.get('name', '')
                     project_identifier = project_data.get('identifier', '')
                     
-                    print(f"프로젝트 {project_id}: {project_name} (식별자: {project_identifier})")
-                    
                     # 프로젝트의 로드맵(버전) 정보 가져오기
                     versions_url = f"{REDMINE_URL}/projects/{project_identifier}/versions.json"
                     versions_response = requests.get(versions_url, headers=headers, timeout=10)
                     
-                    print(f"버전 조회 URL: {versions_url}")
-                    print(f"버전 조회 응답 상태: {versions_response.status_code}")
-                    
                     if versions_response.status_code != 200:
-                        print(f"프로젝트 {project_id} 버전 조회 실패 - 상태 코드: {versions_response.status_code}")
                         continue
                     
                     versions_data = versions_response.json()
                     versions = versions_data.get('versions', [])
-                    
-                    print(f"프로젝트 {project_id}에서 {len(versions)}개 버전 발견")
                     
                     for version in versions:
                         version_id = version.get('id')
@@ -1591,7 +1370,6 @@ class DatabaseManager:
                                 issues_data = issues_response.json()
                                 issues = issues_data.get('issues', [])
                                 connected_issue_ids = [str(issue.get('id')) for issue in issues]
-                                print(f"버전 {version_id}에서 {len(connected_issue_ids)}개 일감 발견 (모든 상태)")
                         except:
                             pass  # 일감 조회 실패 시 무시
                         
@@ -1600,7 +1378,6 @@ class DatabaseManager:
                         
                         # "기본설정" 또는 "기본 설정"인 경우 제외
                         if version_name.strip() in ["기본설정", "기본 설정"]:
-                            print(f"버전 '{version_name}' 제외 (기본설정)")
                             continue
                         
                         # 새 데이터 삽입 (TRUNCATE 후이므로 항상 INSERT)
@@ -1616,7 +1393,6 @@ class DatabaseManager:
                         total_versions += 1
                 
                 except Exception as e:
-                    print(f"프로젝트 {project_id} 로드맵 동기화 중 오류: {str(e)}")
                     continue
             
             conn.commit()
@@ -1642,7 +1418,7 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-    def get_roadmap_by_status(self, status: str) -> Dict:
+    def get_roadmap_by_status(self, status: str) -> Dict: # 수정 불가
         """상태별 로드맵 데이터 조회"""
         conn = self.get_connection()
         if not conn:
@@ -1719,7 +1495,7 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-    def get_roadmap_by_project_id(self, project_id: int) -> Dict:
+    def get_roadmap_by_project_id(self, project_id: int) -> Dict: # 수정 불가
         """프로젝트 ID별 로드맵 데이터 조회"""
         conn = self.get_connection()
         if not conn:

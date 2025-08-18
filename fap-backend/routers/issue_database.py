@@ -1,30 +1,29 @@
 """
 FAP 2.0 - 이슈 데이터베이스 API 라우터 (백엔드)
 
-핵심 역할:
-- FAP 2.0의 핵심 엔진으로, 복잡한 데이터 처리와 분석을 담당
-- 프론트엔드와 백엔드 DB 사이의 중재자 역할
-- 실제 동작을 구현하는 모든 일을 담당
-- 이슈 페이지에서 명령을 받아서 각 DB로부터 데이터들을 받아와서 모든 정보들을 정리해서 리턴
-- 레드마인 서비스로 데이터를 보내서 레드마인 데이터를 변경하는 기능도 담당
-
 주요 기능:
-- 데이터 처리 및 분석: 원시 데이터를 통계 및 분석 데이터로 변환
+- 이슈 데이터 조회 및 분석: 통계, 진행률, 유형별 분석
 - 프로젝트 계층 탐색: SITE → Sub Site → Product 구조 관리
+- 실시간 상태 변경: 드래그 앤 드롭으로 이슈 상태 업데이트
 - 다중 선택 처리: 여러 항목 동시 선택 시 데이터 통합
-- 실시간 상태 변경: 드래그 앤 드롭으로 이슈 상태 업데이트 (레드마인 연동)
-- 데이터 동기화: 레드마인과 로컬 DB 간 데이터 동기화
-- 통계 데이터 생성: 요약, 진행률, 유형별, 인원별 통계
-- API 엔드포인트 제공: 이슈 데이터 조회, 분석, 상태 변경 API
-- 레드마인 데이터 변경: 이슈 상태 변경 시 레드마인 API 호출하여 실제 데이터 변경
 
-데이터 흐름:
-1. 프론트엔드에서 API 요청 수신
-2. 요청 파라미터 파싱 및 검증
-3. DatabaseManager를 통해 DB에서 데이터 조회
-4. 헬퍼 함수들로 데이터 분석 및 가공
-5. 구조화된 응답 데이터 생성 및 반환
-6. 상태 변경 시: 레드마인 서비스 API 호출하여 실제 레드마인 데이터 변경
+API 엔드포인트:
+- /site: 고객사 프로젝트 목록 조회
+- /sub-site: 하위 사이트 목록 조회
+- /sub-sites: 다중 사이트 선택 처리
+- /summary: 요약 통계 데이터
+- /progress: 진행률 데이터
+- /type: 유형별 분석 데이터
+- /member: 인원별 분석 데이터
+- /hw: HW 관련 데이터
+- /sw: SW 관련 데이터
+- /update-issue-status: 이슈 상태 업데이트
+
+기술 스택:
+- FastAPI
+- MariaDB (DatabaseManager)
+- Redmine API 연동
+- 실시간 데이터 처리
 """
 
 from fastapi import APIRouter, Query, HTTPException, Request
@@ -1328,56 +1327,7 @@ def get_sw_detail_analysis(issues: List[Dict]) -> Dict: # 수정 불가
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
 
-@router.post("/sync")
-async def sync_issues(limit: int = Query(100, ge=1, le=10000, description="동기화할 일감 수")): # 미사용  
-    """레드마인에서 일감 동기화"""
-    try:
-        db = DatabaseManager()
-        # result = db.sync_recent_issues(limit)  # 기존 함수 주석 처리
-        result = db.sync_recent_issues_full_data(limit)  # 새로운 함수로 테스트
-        
-        if result['success']:
-            return {
-                "success": True,
-                "message": result['message'],
-                "data": {
-                    "count": result['count'],
-                    "saved": result.get('saved', 0),
-                    "updated": result.get('updated', 0)
-                }
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result['error'])
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"동기화 실패: {str(e)}")
 
-@router.post("/sync-projects")
-async def sync_projects(limit: int = Query(1000, ge=1, le=1000, description="동기화할 프로젝트 수")): # 미사용 
-    """레드마인에서 프로젝트 동기화"""
-    try:
-        db = DatabaseManager()
-        result = db.sync_projects(limit)
-        
-        if result['success']:
-            return {
-                "success": True,
-                "message": result['message'],
-                "data": {
-                    "count": result['count'],
-                    "saved": result.get('saved', 0),
-                    "updated": result.get('updated', 0)
-                }
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result['error'])
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"프로젝트 동기화 실패: {str(e)}")
 
 @router.get("/site")
 async def get_site(): # 수정 불가

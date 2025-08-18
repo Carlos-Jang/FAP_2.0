@@ -1,25 +1,11 @@
 """
 FAP 2.0 - 레드마인 실시간 서비스 API 라우터 (백엔드)
 
-핵심 역할:
-- 레드마인 서버와의 실시간 직접 통신을 담당하는 API 서비스
-- DB와 무관하게 레드마인에서 즉시 데이터 조회 및 업데이트
-- 개별 요청에 대한 실시간 응답 처리
-- 레드마인 API와의 직접적인 상호작용 중재자
-
 주요 기능:
 - 실시간 데이터 조회: 레드마인에서 즉시 데이터 가져오기
 - 실시간 데이터 업데이트: 레드마인에 즉시 데이터 변경 반영
-- 개인 API 키 활용: 사용자별 권한으로 레드마인 데이터 수정
-- 프로젝트 정보 실시간 조회: 프로젝트 이름, 부모-자식 관계 등
 - 이슈 상태 실시간 업데이트: 드래그 앤 드롭으로 즉시 상태 변경
 - AE Make Report 관련 API: 보고서 생성 및 엑셀 다운로드
-
-실시간 통신 특징:
-- DB 저장 없이 직접 레드마인 API 호출
-- 즉시 응답 및 실시간 데이터 교환
-- 개별 요청에 대한 즉각적인 처리
-- 레드마인 서버와의 직접적인 통신
 
 API 엔드포인트:
 - /find-report: 보고서 검색 (실시간 레드마인 조회)
@@ -33,16 +19,10 @@ API 엔드포인트:
 - get_project_name(): 프로젝트 이름 실시간 조회
 - update_issue_status(): 이슈 상태 실시간 업데이트
 
-사용 시나리오:
-- 특정 일감의 실시간 상태 확인 필요 시
-- 일감 상태 즉시 업데이트 필요 시
-- 프로젝트 정보 실시간 조회 필요 시
-- 사용자 인증 실시간 확인 필요 시
-- 보고서 생성 및 다운로드 필요 시
-
-DB Manager와의 차이점:
-- DB Manager: 로컬 DB 기반, 배치 처리, 주기적 동기화
-- Redmine Service: 실시간 API 호출, 즉시 응답, 직접 통신
+기술 스택:
+- FastAPI
+- Redmine API
+- 실시간 데이터 처리
 """
 
 # routers/redmine_service.py
@@ -122,10 +102,7 @@ def update_issue_status(issue_id: int, old_status_name: str, new_status_name: st
         issue_data = response.json().get("issue", {})
         current_status_name = issue_data.get("status", {}).get("name", "")
         
-        print(f"DEBUG: 이슈 #{issue_id} 전체 데이터: {issue_data}")
-        print(f"DEBUG: 이슈 #{issue_id} 현재 상태: {current_status_name}")
-        print(f"DEBUG: 예상 상태: {old_status_name}")
-        print(f"DEBUG: 변경할 상태: {new_status_name}")
+
         
         # 2. 일감 정보에 status_name이 올드 네임인지 확인한다
         if current_status_name != old_status_name:
@@ -146,7 +123,7 @@ def update_issue_status(issue_id: int, old_status_name: str, new_status_name: st
             }
         
         new_status_id = status_result["data"]["status_id"]
-        print(f"DEBUG: 상태명 '{new_status_name}' → 상태 ID: {new_status_id}")
+
         
         # 4. Redmine API 호출하여 이슈 상태 업데이트 (status_id 사용)
         update_headers = {
@@ -160,14 +137,11 @@ def update_issue_status(issue_id: int, old_status_name: str, new_status_name: st
             }
         }
         
-        print(f"DEBUG: Redmine PUT URL: {url}")
-        print(f"DEBUG: Redmine PUT Headers: {dict(update_headers)}")
-        print(f"DEBUG: Redmine PUT Data: {update_data}")
+
         
         update_response = requests.put(url, headers=update_headers, json=update_data, timeout=10)
         
-        print(f"DEBUG: Redmine PUT 응답 상태 코드: {update_response.status_code}")
-        print(f"DEBUG: Redmine PUT 응답 내용: {update_response.text}")
+
         
         if update_response.status_code == 204:  # Redmine 성공 응답
             return {
