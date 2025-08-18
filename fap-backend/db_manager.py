@@ -209,6 +209,64 @@ class DatabaseManager:
         finally:
             conn.close()
     
+    def get_issue_by_id(self, issue_id: int) -> Dict:
+        """특정 ID의 일감 정보를 조회하는 메서드"""
+        conn = self.get_connection()
+        if not conn:
+            return {}
+        
+        try:
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            
+            # 해당 ID의 일감 정보 조회
+            query = """
+                SELECT redmine_id, project_id, project_name, tracker_id, tracker_name,
+                       status_id, status_name, is_closed, priority_id, priority_name,
+                       author_id, author_name, assigned_to_id, assigned_to_name,
+                       subject, description, cost, pending, product,
+                       created_on, updated_on, raw_data
+                FROM issues 
+                WHERE redmine_id = %s
+            """
+            
+            cursor.execute(query, (issue_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                issue = {
+                    'redmine_id': row.get('redmine_id'),
+                    'project_id': row.get('project_id'),
+                    'project_name': row.get('project_name'),
+                    'tracker_id': row.get('tracker_id'),
+                    'tracker_name': row.get('tracker_name'),
+                    'status_id': row.get('status_id'),
+                    'status_name': row.get('status_name'),
+                    'is_closed': row.get('is_closed'),
+                    'priority_id': row.get('priority_id'),
+                    'priority_name': row.get('priority_name'),
+                    'author_id': row.get('author_id'),
+                    'author_name': row.get('author_name'),
+                    'assigned_to_id': row.get('assigned_to_id'),
+                    'assigned_to_name': row.get('assigned_to_name'),
+                    'subject': row.get('subject'),
+                    'description': row.get('description'),
+                    'cost': row.get('cost'),
+                    'pending': row.get('pending'),
+                    'product': row.get('product'),
+                    'created_on': row.get('created_on'),
+                    'updated_on': row.get('updated_on'),
+                    'raw_data': row.get('raw_data')
+                }
+                return issue
+            else:
+                return {}
+            
+        except Exception as e:
+            print(f"일감 ID {issue_id} 조회 실패: {e}")
+            return {}
+        finally:
+            conn.close()
+    
     def sync_recent_issues(self, limit: int = 100) -> Dict:  # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (50개씩 병렬 처리, 기존 DB 삭제 후 새로 추가)"""
         try:
@@ -1442,7 +1500,7 @@ class DatabaseManager:
 
 # ===== 로드맵 관련 메서드들 =====
 
-    def sync_roadmap_data(self) -> Dict:
+    def sync_roadmap_data(self) -> Dict: # 수정 불가
         """로드맵 데이터 동기화 - PMS에서 로드맵 정보를 가져와서 DB에 저장"""
         try:
             import requests
@@ -1522,16 +1580,18 @@ class DatabaseManager:
                         if wiki_page_title:
                             wiki_page_url = f"{REDMINE_URL}/projects/{project_identifier}/wiki/{wiki_page_title}"
                         
-                        # 연결된 일감 ID들 가져오기
+                        # 연결된 일감 ID들 가져오기 (모든 일감)
                         connected_issue_ids = []
                         try:
-                            issues_url = f"{REDMINE_URL}/issues.json?fixed_version_id={version_id}"
+                            # 모든 일감 가져오기 (진행중 + 완료 모두)
+                            issues_url = f"{REDMINE_URL}/issues.json?fixed_version_id={version_id}&limit=100&status_id=*"
                             issues_response = requests.get(issues_url, headers=headers, timeout=10)
                             
                             if issues_response.status_code == 200:
                                 issues_data = issues_response.json()
                                 issues = issues_data.get('issues', [])
                                 connected_issue_ids = [str(issue.get('id')) for issue in issues]
+                                print(f"버전 {version_id}에서 {len(connected_issue_ids)}개 일감 발견 (모든 상태)")
                         except:
                             pass  # 일감 조회 실패 시 무시
                         
@@ -1575,6 +1635,152 @@ class DatabaseManager:
             return {
                 "success": False,
                 "error": f"로드맵 데이터 동기화 실패: {str(e)}"
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def get_roadmap_by_status(self, status: str) -> Dict:
+        """상태별 로드맵 데이터 조회"""
+        conn = self.get_connection()
+        if not conn:
+            return {
+                "success": False,
+                "message": "데이터베이스 연결 실패",
+                "data": []
+            }
+        
+        cursor = None
+        try:
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            
+            # status 파라미터 검증
+            if status not in ['open', 'closed']:
+                return {
+                    "success": False,
+                    "message": "잘못된 status 값입니다. 'open' 또는 'closed'를 입력해주세요.",
+                    "data": []
+                }
+            
+            # 해당 status의 모든 로드맵 데이터 조회
+            query = """
+                SELECT id, redmine_version_id, project_id, project_name, version_name, 
+                       status, description, due_date, created_on, updated_on, 
+                       wiki_page_title, wiki_page_url, connected_issue_ids,
+                       created_at, updated_at
+                FROM roadmap_versions 
+                WHERE status = %s
+                ORDER BY created_on DESC
+            """
+            
+            cursor.execute(query, (status,))
+            results = cursor.fetchall()
+            
+            # 결과 데이터 정리
+            roadmap_data = []
+            for row in results:
+                roadmap_item = {
+                    "id": row.get('id'),
+                    "redmine_version_id": row.get('redmine_version_id'),
+                    "project_id": row.get('project_id'),
+                    "project_name": row.get('project_name'),
+                    "version_name": row.get('version_name'),
+                    "status": row.get('status'),
+                    "description": row.get('description'),
+                    "due_date": row.get('due_date'),
+                    "created_on": row.get('created_on'),
+                    "updated_on": row.get('updated_on'),
+                    "wiki_page_title": row.get('wiki_page_title'),
+                    "wiki_page_url": row.get('wiki_page_url'),
+                    "connected_issue_ids": row.get('connected_issue_ids'),
+                    "created_at": row.get('created_at'),
+                    "updated_at": row.get('updated_at')
+                }
+                roadmap_data.append(roadmap_item)
+            
+            return {
+                "success": True,
+                "message": f"{status} 상태의 로드맵 데이터 조회 완료",
+                "data": roadmap_data,
+                "count": len(roadmap_data)
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"로드맵 데이터 조회 실패: {str(e)}",
+                "data": []
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def get_roadmap_by_project_id(self, project_id: int) -> Dict:
+        """프로젝트 ID별 로드맵 데이터 조회"""
+        conn = self.get_connection()
+        if not conn:
+            return {
+                "success": False,
+                "message": "데이터베이스 연결 실패",
+                "data": []
+            }
+        
+        cursor = None
+        try:
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            
+            # 해당 프로젝트 ID의 모든 로드맵 데이터 조회
+            query = """
+                SELECT id, redmine_version_id, project_id, project_name, version_name, 
+                       status, description, due_date, created_on, updated_on, 
+                       wiki_page_title, wiki_page_url, connected_issue_ids,
+                       created_at, updated_at
+                FROM roadmap_versions 
+                WHERE project_id = %s
+                ORDER BY created_on DESC
+            """
+            
+            cursor.execute(query, (project_id,))
+            results = cursor.fetchall()
+            
+            # 결과 데이터 정리
+            roadmap_data = []
+            for row in results:
+                roadmap_item = {
+                    "id": row.get('id'),
+                    "redmine_version_id": row.get('redmine_version_id'),
+                    "project_id": row.get('project_id'),
+                    "project_name": row.get('project_name'),
+                    "version_name": row.get('version_name'),
+                    "status": row.get('status'),
+                    "description": row.get('description'),
+                    "due_date": row.get('due_date'),
+                    "created_on": row.get('created_on'),
+                    "updated_on": row.get('updated_on'),
+                    "wiki_page_title": row.get('wiki_page_title'),
+                    "wiki_page_url": row.get('wiki_page_url'),
+                    "connected_issue_ids": row.get('connected_issue_ids'),
+                    "created_at": row.get('created_at'),
+                    "updated_at": row.get('updated_at')
+                }
+                roadmap_data.append(roadmap_item)
+            
+            return {
+                "success": True,
+                "message": f"프로젝트 ID {project_id}의 로드맵 데이터 조회 완료",
+                "data": roadmap_data,
+                "count": len(roadmap_data)
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"로드맵 데이터 조회 실패: {str(e)}",
+                "data": []
             }
         finally:
             if cursor:
