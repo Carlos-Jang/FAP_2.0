@@ -42,8 +42,8 @@ class DatabaseManager:
         self.db_config = {
             'host': 'localhost',
             'port': 3306,
-            'user': 'root',
-            'password': 'ati5344!',  # MariaDB root 비밀번호
+            'user': 'fap',
+            'password': 'ati5344',  # MariaDB root 비밀번호
             'database': 'fap_redmine',
             'charset': 'utf8mb4'
         }
