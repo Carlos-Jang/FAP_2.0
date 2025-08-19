@@ -111,11 +111,40 @@ export default function Layout({ children }: { children: ReactNode }) {
             // 기존 로직 유지 (다른 Role들의 경우)
             return false; // userRoles가 제거되었으므로 항상 false 반환
           }).map(nav => (
-            <button
-              key={nav.path}
-              onClick={() => navigate(nav.path)}
-              className={`fap-nav-btn${location.pathname === nav.path ? ' active' : ''}`}
-            >
+                         <button
+               key={nav.path}
+               onClick={() => navigate(nav.path)}
+               className={`fap-nav-btn${location.pathname === nav.path ? ' active' : ''}`}
+               style={{
+                 background: location.pathname === nav.path ? '#ffffff' : 'transparent',
+                 color: location.pathname === nav.path ? '#000000' : '#ffffff',
+                 border: 'none',
+                 borderRadius: '10px',
+                 fontWeight: 'bold',
+                 fontSize: '1.15rem',
+                 marginRight: '10px',
+                 padding: '0.7rem 2.5rem',
+                 outline: 'none',
+                 cursor: 'pointer',
+                 transition: 'all 0.3s ease',
+                 boxShadow: 'none',
+                 transform: 'translateY(0)'
+               }}
+               onMouseEnter={(e) => {
+                 if (location.pathname !== nav.path) {
+                   e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 255, 255, 0.2)';
+                   e.currentTarget.style.transform = 'translateY(-2px)';
+                 }
+               }}
+               onMouseLeave={(e) => {
+                 if (location.pathname !== nav.path) {
+                   e.currentTarget.style.background = 'transparent';
+                   e.currentTarget.style.boxShadow = 'none';
+                   e.currentTarget.style.transform = 'translateY(0)';
+                 }
+               }}
+             >
               {nav.label}
             </button>
           ))}

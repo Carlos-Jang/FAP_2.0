@@ -50,7 +50,11 @@ app = FastAPI(title="FAP 2.0", version="0.1.0")
 # CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # 프론트엔드 주소들
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://localhost:3000",
+        "https://125.6.44.31:8443"  # 배포 환경 도메인 추가
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

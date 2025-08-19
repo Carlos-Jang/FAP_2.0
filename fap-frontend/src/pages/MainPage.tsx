@@ -135,7 +135,7 @@ export default function MainPage() {
           const userName = localStorage.getItem('fap_user_name');
           if (!userName) {
             // API 키 존재 여부 한번 더 확인
-            const response = await axios.get(`http://localhost:8000/api/settings/check-user-api-key/${userLogin}`);
+            const response = await axios.get(`/fap/api/settings/check-user-api-key/${userLogin}`);
             
             if (!response.data.success) {
               // API 키가 없으면 알림만 표시
@@ -153,7 +153,7 @@ export default function MainPage() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:8000/api/main/roadmap-dashboard');
+        const response = await axios.get('/fap/api/main/roadmap-dashboard');
         
         if (response.data.success) {
           setDashboardData(response.data.data);
@@ -178,7 +178,7 @@ export default function MainPage() {
     
     try {
       setLoadingWiki(true);
-      const response = await axios.get(`http://localhost:8000/api/main/wiki-content?wiki_url=${encodeURIComponent(wikiUrl)}`);
+      const response = await axios.get(`/fap/api/main/wiki-content?wiki_url=${encodeURIComponent(wikiUrl)}`);
       
       if (response.data.success) {
         setWikiContent(response.data.data.content);
@@ -193,7 +193,7 @@ export default function MainPage() {
         
         for (const attachment of imageAttachments) {
           try {
-            const imageResponse = await axios.get(`http://localhost:8000/api/main/attachment-image/${attachment.id}`);
+            const imageResponse = await axios.get(`/fap/api/main/attachment-image/${attachment.id}`);
             if (imageResponse.data.success) {
               setImageDataUrls(prev => ({
                 ...prev,

@@ -61,7 +61,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/login', {
+             const res = await fetch('/fap/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, password })
@@ -76,7 +76,7 @@ export default function LoginPage() {
         
         // API 키 존재 여부 확인
         try {
-          const apiResponse = await axios.get(`http://localhost:8000/api/settings/check-user-api-key/${id}`);
+          const apiResponse = await axios.get(`/fap/api/settings/check-user-api-key/${id}`);
           
           if (apiResponse.data.success) {
             // API 키가 있으면 사용자 정보를 localStorage에 저장

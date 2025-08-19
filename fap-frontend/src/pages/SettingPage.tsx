@@ -59,7 +59,7 @@ export default function SettingPage() {
     }
 
     try {
-      const response = await axios.post('http://localhost:8000/api/settings/save-user-api-key', {
+      const response = await axios.post('/fap/api/settings/save-user-api-key', {
         api_key: apiKey
       });
 
@@ -87,7 +87,7 @@ export default function SettingPage() {
 
   const handleLoadProjects = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/settings/sync-projects', {}, {
+      const response = await axios.post('/fap/api/settings/sync-projects', {}, {
         params: { limit: projectLimit }
       });
       
@@ -104,7 +104,7 @@ export default function SettingPage() {
 
   const handleLoadIssues = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/settings/sync-issues', {}, {
+      const response = await axios.post('/fap/api/settings/sync-issues', {}, {
         params: { limit: issueLimit }
       });
       
@@ -121,7 +121,7 @@ export default function SettingPage() {
 
   const handleLoadIssueStatuses = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/settings/sync-statuses');
+      const response = await axios.post('/fap/api/settings/sync-statuses');
       
       if (response.data.success) {
         alert(`이슈 상태 로드 완료!\n${response.data.message}\n총 ${response.data.data.count}개 상태 처리됨`);
@@ -136,7 +136,7 @@ export default function SettingPage() {
 
   const handleLoadRoadmapData = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/settings/sync-roadmap-data');
+      const response = await axios.post('/fap/api/settings/sync-roadmap-data');
       
       if (response.data.success) {
         alert(`로드맵 데이터 로드 완료!\n${response.data.message}\n총 ${response.data.data.count}개 로드맵 처리됨`);
