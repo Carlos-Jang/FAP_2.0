@@ -26,7 +26,7 @@ export default function AESaveReportPage() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/issues/create', {
+      const response = await fetch('/fap/api/issues/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

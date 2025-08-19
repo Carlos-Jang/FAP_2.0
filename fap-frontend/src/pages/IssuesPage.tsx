@@ -199,7 +199,7 @@ export default function IssuesPage() {
   // 고객사 프로젝트 목록 가져오기 (SITE 버튼용)
   const fetchCustomerProjects = async () => {
     try {
-      const response = await fetch('/api/issues/site');
+      const response = await fetch('/fap/api/issues/site');
       if (response.ok) {
         const data = await response.json();
         setCustomerProjects(data.projects || []);
@@ -266,7 +266,7 @@ export default function IssuesPage() {
     } else if (currentSelectedSiteIndexes.length === 1) {
       // 단일 선택인 경우 기존 API 사용
       try {
-        const response = await fetch(`/api/issues/sub-site?site_index=${currentSelectedSiteIndexes[0]}`);
+        const response = await fetch(`/fap/api/issues/sub-site?site_index=${currentSelectedSiteIndexes[0]}`);
         if (response.ok) {
           const data = await response.json();
           if (data.projects) {
@@ -279,7 +279,7 @@ export default function IssuesPage() {
     } else {
       // 다중 선택인 경우 새로운 API 사용
       try {
-        const response = await fetch('/api/issues/sub-sites', {
+        const response = await fetch('/fap/api/issues/sub-sites', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -348,7 +348,7 @@ export default function IssuesPage() {
         // ALL 선택 시 모든 Sub Site List를 백엔드로 전송
         try {
           const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
-          const response = await fetch('/api/issues/get-all-product-list', {
+          const response = await fetch('/fap/api/issues/get-all-product-list', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sub_site_list: subSiteNames })
@@ -366,7 +366,7 @@ export default function IssuesPage() {
       } else {
         // 특정 Sub Site 선택
         try {
-          const response = await fetch(`/api/issues/product-list?sub_project_name=${currentSelectedSubSites[0]}`);
+          const response = await fetch(`/fap/api/issues/product-list?sub_project_name=${currentSelectedSubSites[0]}`);
           if (response.ok) {
             const data = await response.json();
             if (data.success) {
@@ -384,7 +384,7 @@ export default function IssuesPage() {
         // ALL이 포함된 다중 선택: 기존처럼 모든 Sub Site의 Product List 출력
         try {
           const subSiteNames = subProjects.map(project => project.project_name).filter(name => name !== 'ALL');
-          const response = await fetch('/api/issues/get-all-product-list', {
+          const response = await fetch('/fap/api/issues/get-all-product-list', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sub_site_list: subSiteNames })
@@ -402,7 +402,7 @@ export default function IssuesPage() {
       } else {
         // ALL이 포함되지 않은 다중 선택: 선택된 Sub Site들의 Product List 합치기
         try {
-          const response = await fetch('/api/issues/product-lists', {
+          const response = await fetch('/fap/api/issues/product-lists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -480,7 +480,7 @@ export default function IssuesPage() {
   // 주간 업무보고 데이터 로드
   const loadSummaryReportData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-summary-report', {
+      const response = await fetch('/fap/api/issues/get-summary-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -506,7 +506,7 @@ export default function IssuesPage() {
   // 진행율 데이터 로드
   const loadProgressData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-progress-data', {
+      const response = await fetch('/fap/api/issues/get-progress-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -532,7 +532,7 @@ export default function IssuesPage() {
   // 유형 데이터 로드
   const loadTypeData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-type-data', {
+      const response = await fetch('/fap/api/issues/get-type-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -558,7 +558,7 @@ export default function IssuesPage() {
   // 인원 데이터 로드
   const loadMemberData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-member-data', {
+      const response = await fetch('/fap/api/issues/get-member-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -584,7 +584,7 @@ export default function IssuesPage() {
   // HW 데이터 로드
   const loadHWData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-hw-data', {
+      const response = await fetch('/fap/api/issues/get-hw-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -610,7 +610,7 @@ export default function IssuesPage() {
   // SW 데이터 로드
   const loadSWData = async (productNames: string[]) => {
     try {
-      const response = await fetch('/api/issues/get-sw-data', {
+      const response = await fetch('/fap/api/issues/get-sw-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -686,7 +686,7 @@ export default function IssuesPage() {
         }
 
         // API 호출해서 실제 상태 변경
-        const response = await fetch('/api/issues/update-progress-status', {
+        const response = await fetch('/fap/api/issues/update-progress-status', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
