@@ -365,24 +365,32 @@ class DatabaseManager:
 
     def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (전체 컬럼 분해 저장, 병렬 처리)"""
+        print("=== 이슈 동기화 시작 ===")
         try:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             
             print(f"레드마인 API 병렬 호출 중... (50개씩 배치 처리)")
             
             # 1. 먼저 API 연결 확인
+            print("1. 레드마인 API 연결 확인 중...")
             test_url = f"{REDMINE_URL}/issues.json"
             test_params = {'limit': 1, 'key': API_KEY}
+            print(f"   API URL: {test_url}")
+            print(f"   API Key: {API_KEY[:10]}...")
             test_response = requests.get(test_url, params=test_params, timeout=10)
             
+            print(f"   API 응답 상태: {test_response.status_code}")
             if test_response.status_code != 200:
+                print(f"   API 연결 실패: {test_response.status_code}")
                 return {
                     'success': False,
                     'error': f'레드마인 API 연결 실패: {test_response.status_code}',
                     'count': 0
                 }
+            print("   API 연결 성공!")
             
             # 2. 50개씩 나누어서 병렬로 API 호출
+            print("2. 레드마인에서 일감 데이터 가져오기 시작...")
             all_issues = []
             batch_size = 50
             offset = 0
@@ -442,24 +450,27 @@ class DatabaseManager:
             print(f"총 {len(all_issues)}개 일감을 가져왔습니다.")
             
             # 3. DB에 저장
+            print("3. DB 연결 중...")
             conn = self.get_connection()
             if not conn:
+                print("   DB 연결 실패!")
                 return {
                     'success': False,
                     'error': 'DB 연결 실패',
                     'count': 0
                 }
+            print("   DB 연결 성공!")
             
             cursor = conn.cursor()
             
             # 기존 issues 테이블 전체 삭제
-            print("기존 일감 데이터 삭제 중...")
+            print("4. 기존 일감 데이터 삭제 중...")
             cursor.execute("DELETE FROM issues")
             deleted_count = cursor.rowcount
-            print(f"기존 {deleted_count}개 일감 데이터 삭제 완료")
+            print(f"   기존 {deleted_count}개 일감 데이터 삭제 완료")
             
             # 새로운 일감 데이터 삽입 (컬럼 분해)
-            print("새로운 일감 데이터 삽입 중...")
+            print("5. 새로운 일감 데이터 삽입 중...")
             saved_count = 0
             
             for issue in all_issues:
@@ -578,6 +589,7 @@ class DatabaseManager:
             conn.commit()
             conn.close()
             
+            print("=== 이슈 동기화 완료 ===")
             return {
                 'success': True,
                 'message': f'일감 동기화 완료: 기존 {deleted_count}개 삭제, 새로 {saved_count}개 추가',
@@ -587,6 +599,7 @@ class DatabaseManager:
             }
             
         except Exception as e:
+            print(f"=== 이슈 동기화 에러: {str(e)} ===")
             return {
                 'success': False,
                 'error': f'일감 동기화 실패: {str(e)}',

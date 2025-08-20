@@ -90,4 +90,4 @@ async def login(req: LoginRequest):  # 수정 불가
             # 인증 실패
             raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Redmine 서버와 통신에 실패했습니다.")
+        raise HTTPException(status_code=500, detail="PMS와 동일한 ID 비밀번호를 입력해주세요.")

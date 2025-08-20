@@ -96,7 +96,7 @@ export default function LoginPage() {
         alert(data.detail || '로그인에 실패했습니다.');
       }
     } catch (err) {
-      alert('서버와 통신에 실패했습니다.');
+      alert('PMS와 동일한 ID 비밀번호를 입력해주세요.');
     } finally {
       setLoading(false);
     }
