@@ -83,15 +83,13 @@ interface RoadmapData {
   status: string;
   description: string;
   due_date: string | null;
-  created_on: string;
-  updated_on: string;
+  created_at: string;
+  updated_at: string;
   wiki_page_title: string;
   wiki_page_url: string;
   connected_issue_ids: string;
   connected_issues_detail: any[];
   connected_issues_analysis: any;
-  created_at: string;
-  updated_at: string;
 }
 
 interface DashboardData {
@@ -434,7 +432,7 @@ export default function MainPage() {
                                 fontWeight: '500',
                                 zIndex: 2
                               }}>
-                                {roadmap.created_on ? new Date(roadmap.created_on).toLocaleDateString() : '-'} ~
+                                {roadmap.created_at ? new Date(roadmap.created_at).toLocaleDateString() : '-'} ~
                               </div>
                               <div style={{ 
                                 fontSize: '16px', 
@@ -517,7 +515,7 @@ export default function MainPage() {
                  }}>
                    <span>{selectedRoadmap.project_name}</span>
                    <span style={{ color: '#94A3B8' }}>•</span>
-                   <span>시작일: {selectedRoadmap.created_on ? new Date(selectedRoadmap.created_on).toLocaleDateString() : '-'}</span>
+                   <span>시작일: {selectedRoadmap.created_at ? new Date(selectedRoadmap.created_at).toLocaleDateString() : '-'}</span>
                  </div>
                </div>
                <button
@@ -1095,7 +1093,7 @@ export default function MainPage() {
               <div>
                 <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>생성일</div>
                 <div style={{ fontSize: '1rem', color: '#222' }}>
-                  {selectedIssue.created_on ? new Date(selectedIssue.created_on).toLocaleDateString('ko-KR') : '정보 없음'}
+                  {selectedIssue.created_at ? new Date(selectedIssue.created_at).toLocaleDateString('ko-KR') : '정보 없음'}
                 </div>
               </div>
             </div>

@@ -342,8 +342,8 @@ def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
                     'subject': issue.get('subject'),
                     'tracker_name': issue.get('tracker_name'),
                     'status_name': issue.get('status_name'),
-                    'created_date': issue.get('created_on'),
-                    'updated_date': issue.get('updated_on'),
+                    'created_date': issue.get('created_at'),
+                    'updated_date': issue.get('updated_at'),
                     'description': issue.get('description'),
                     'is_closed': issue.get('is_closed')
                 })
@@ -1314,8 +1314,8 @@ def get_sw_detail_analysis(issues: List[Dict]) -> Dict: # 수정 불가
             'subject': issue.get('subject', ''),
             'is_closed': issue.get('is_closed', 0),
             'description': issue.get('description', ''),
-            'created_on': issue.get('created_on', ''),
-            'updated_on': issue.get('updated_on', ''),
+            'created_on': issue.get('created_at', ''),
+            'updated_on': issue.get('updated_at', ''),
             'author_name': issue.get('author_name', ''),
             'status': issue.get('status', ''),
             'project_id': project_id,

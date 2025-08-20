@@ -48,13 +48,33 @@ class DatabaseManager:
             'charset': 'utf8mb4'
         }
     
-    def get_connection(self):  # 수정 불가
-        """데이터베이스 연결 반환"""
+    def get_connection(self):  
+        """데이터베이스 연결 반환 (서버 환경 실패 시 로컬 환경으로 재시도)"""
         try:
+            # 서버 환경 DB 연결 시도
             conn = pymysql.connect(**self.db_config)
             return conn
         except Exception as e:
-            return None
+            print(f"   서버 환경 DB 연결 실패: {str(e)}")
+            print("   로컬 환경 DB 연결로 재시도...")
+            
+            # 로컬 환경 DB 설정으로 재시도
+            local_db_config = {
+                'host': 'localhost',
+                'port': 3306,
+                'user': 'root',
+                'password': 'ati5344!',
+                'database': 'fap_redmine',
+                'charset': 'utf8mb4'
+            }
+            
+            try:
+                conn = pymysql.connect(**local_db_config)
+                print("   로컬 환경 DB 연결 성공!")
+                return conn
+            except Exception as local_e:
+                print(f"   로컬 환경 DB 연결도 실패: {str(local_e)}")
+                return None
     
     def update_projects_table_structure(self) -> bool:  # 수정 불가
         """프로젝트 테이블 구조를 7개 컬럼으로 업데이트"""
@@ -127,11 +147,11 @@ class DatabaseManager:
                        status_id, status_name, is_closed, priority_id, priority_name,
                        author_id, author_name, assigned_to_id, assigned_to_name,
                        subject, description, cost, pending, product,
-                       created_on, updated_on, raw_data
+                       created_at, updated_at, raw_data
                 FROM issues 
-                WHERE created_on >= %s AND created_on <= %s
+                WHERE created_at >= %s AND created_at <= %s
                    AND project_id IN ({id_placeholders})
-                ORDER BY updated_on DESC
+                ORDER BY updated_at DESC
             """
             
             # 파라미터 준비 (기간 2개 + 프로젝트 ID들)
@@ -163,8 +183,8 @@ class DatabaseManager:
                     'cost': row[16],
                     'pending': row[17],
                     'product': row[18],
-                    'created_on': row[19],
-                    'updated_on': row[20],
+                    'created_at': row[19],
+                    'updated_at': row[20],
                     'raw_data': row[21]
                 }
                 issues.append(issue)
@@ -177,30 +197,35 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def get_issue_by_id(self, issue_id: int) -> Dict: # 수정 불가
-        """특정 ID의 일감 정보를 조회하는 메서드"""
+    def get_issues_by_ids(self, issue_ids: List[int]) -> List[Dict]: # 수정 불가
+        """여러 ID의 일감 정보를 한 번에 조회하는 메서드"""
+        if not issue_ids:
+            return []
+            
         conn = self.get_connection()
         if not conn:
-            return {}
+            return []
         
         try:
             cursor = conn.cursor(pymysql.cursors.DictCursor)
             
-            # 해당 ID의 일감 정보 조회
-            query = """
+            # 여러 ID의 일감 정보를 한 번에 조회
+            placeholders = ','.join(['%s'] * len(issue_ids))
+            query = f"""
                 SELECT redmine_id, project_id, project_name, tracker_id, tracker_name,
                        status_id, status_name, is_closed, priority_id, priority_name,
                        author_id, author_name, assigned_to_id, assigned_to_name,
                        subject, description, cost, pending, product,
-                       created_on, updated_on, raw_data
+                       created_at, updated_at, raw_data
                 FROM issues 
-                WHERE redmine_id = %s
+                WHERE redmine_id IN ({placeholders})
             """
             
-            cursor.execute(query, (issue_id,))
-            row = cursor.fetchone()
+            cursor.execute(query, issue_ids)
+            rows = cursor.fetchall()
             
-            if row:
+            issues = []
+            for row in rows:
                 issue = {
                     'redmine_id': row.get('redmine_id'),
                     'project_id': row.get('project_id'),
@@ -221,17 +246,17 @@ class DatabaseManager:
                     'cost': row.get('cost'),
                     'pending': row.get('pending'),
                     'product': row.get('product'),
-                    'created_on': row.get('created_on'),
-                    'updated_on': row.get('updated_on'),
+                    'created_at': row.get('created_at'),
+                    'updated_at': row.get('updated_at'),
                     'raw_data': row.get('raw_data')
                 }
-                return issue
-            else:
-                return {}
+                issues.append(issue)
+            
+            return issues
             
         except Exception as e:
-            print(f"일감 ID {issue_id} 조회 실패: {e}")
-            return {}
+            print(f"일감 ID들 {issue_ids} 조회 실패: {e}")
+            return []
         finally:
             conn.close()
     
@@ -363,7 +388,7 @@ class DatabaseManager:
                 'count': 0
             }
 
-    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: 
+    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: # 수정 불가
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (전체 컬럼 분해 저장, 병렬 처리)"""
         print("=== 이슈 동기화 시작 ===")
         try:
@@ -514,6 +539,10 @@ class DatabaseManager:
                 subject = issue.get('subject', '')
                 description = issue.get('description', '')
                 
+                # 시간 필드 추출
+                created_on = issue.get('created_on', '')
+                updated_on = issue.get('updated_on', '')
+                
                 # 커스텀 필드 추출
                 custom_fields = issue.get('custom_fields', [])
                 cost = ''
@@ -542,7 +571,7 @@ class DatabaseManager:
                         author_id, author_name, assigned_to_id, assigned_to_name,
                         subject, description, cost, pending, product
                     ) VALUES (
-                        %s, %s, NOW(), NOW(),
+                        %s, %s, %s, %s,
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s,
@@ -550,6 +579,7 @@ class DatabaseManager:
                     )
                 """, (
                     redmine_id, json.dumps(issue, ensure_ascii=False),
+                    created_on, updated_on,
                     project_id, project_name, tracker_id, tracker_name,
                     status_id, status_name, is_closed, priority_id, priority_name,
                     author_id, author_name, assigned_to_id, assigned_to_name,
@@ -774,16 +804,14 @@ class DatabaseManager:
             'project_name': row[2],
             'raw_data': row[3],
             'children_ids': row[4],  # 새로 추가된 컬럼
-            'level': row[5],         # 새로 추가된 컬럼
-            'created_at': row[6],
-            'updated_at': row[7]
+            'level': row[5]          # 새로 추가된 컬럼
         }
         project['data'] = self._parse_issue_data(project['raw_data'])  # 일감과 동일한 방식
         return project
       
 
 
-    def get_projects_by_ids(self, project_ids: List[int]) -> List[Dict]:  # 수정 불가
+    def get_projects_by_ids(self, project_ids: List[int]) -> List[Dict]:
         """프로젝트 ID 리스트로 해당 프로젝트들의 전체 정보 조회"""
         if not project_ids:
             return []
@@ -798,7 +826,7 @@ class DatabaseManager:
             # ID 리스트를 문자열로 변환하여 IN 절에 사용
             id_placeholders = ','.join(['%s'] * len(project_ids))
             query = f"""
-                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at 
+                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level
                 FROM projects 
                 WHERE redmine_project_id IN ({id_placeholders})
                 ORDER BY project_name ASC
@@ -828,7 +856,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             
             query = """
-                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at 
+                SELECT id, redmine_project_id, project_name, raw_data, children_ids, level
                 FROM projects 
                 WHERE project_name = %s
                 ORDER BY project_name ASC
@@ -932,17 +960,7 @@ class DatabaseManager:
             
             cursor = conn.cursor()
             
-            # projects_default 테이블이 없으면 생성
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS projects_default (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    redmine_id INT,
-                    project_name VARCHAR(255),
-                    raw_data JSON,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                )
-            """)
+
             
             # 기존 projects_default 테이블 전체 삭제
             print("기존 프로젝트 데이터 삭제 중...")
@@ -1064,8 +1082,8 @@ class DatabaseManager:
             
             for project_id, project_info in projects_dict.items():
                 cursor.execute("""
-                    INSERT INTO projects (redmine_project_id, project_name, raw_data, children_ids, level, created_at, updated_at) 
-                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                    INSERT INTO projects (redmine_project_id, project_name, raw_data, children_ids, level) 
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (
                     project_info['id'],
                     project_info['name'],
@@ -1333,7 +1351,6 @@ class DatabaseManager:
                         version_name = version.get('name', '')
                         status = version.get('status', '')
                         description = version.get('description', '')
-                        due_date = version.get('due_date')
                         created_on = version.get('created_on')
                         updated_on = version.get('updated_on')
                         wiki_page_title = version.get('wiki_page_title', '')
@@ -1368,10 +1385,10 @@ class DatabaseManager:
                         cursor.execute("""
                             INSERT INTO roadmap_versions 
                             (redmine_version_id, project_id, project_name, version_name, status, description,
-                             due_date, created_on, updated_on, wiki_page_title, wiki_page_url, connected_issue_ids)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             wiki_page_title, wiki_page_url, connected_issue_ids, created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (version_id, project_id, project_name, version_name, status, description,
-                              due_date, created_on, updated_on, wiki_page_title, wiki_page_url, connected_issue_ids_str))
+                              wiki_page_title, wiki_page_url, connected_issue_ids_str, created_on, updated_on))
                         saved_count += 1
                         
                         total_versions += 1
@@ -1427,12 +1444,11 @@ class DatabaseManager:
             # 해당 status의 모든 로드맵 데이터 조회
             query = """
                 SELECT id, redmine_version_id, project_id, project_name, version_name, 
-                       status, description, due_date, created_on, updated_on, 
-                       wiki_page_title, wiki_page_url, connected_issue_ids,
+                       status, description, wiki_page_title, wiki_page_url, connected_issue_ids,
                        created_at, updated_at
                 FROM roadmap_versions 
                 WHERE status = %s
-                ORDER BY created_on DESC
+                ORDER BY created_at DESC
             """
             
             cursor.execute(query, (status,))
@@ -1449,9 +1465,6 @@ class DatabaseManager:
                     "version_name": row.get('version_name'),
                     "status": row.get('status'),
                     "description": row.get('description'),
-                    "due_date": row.get('due_date'),
-                    "created_on": row.get('created_on'),
-                    "updated_on": row.get('updated_on'),
                     "wiki_page_title": row.get('wiki_page_title'),
                     "wiki_page_url": row.get('wiki_page_url'),
                     "connected_issue_ids": row.get('connected_issue_ids'),
@@ -1479,71 +1492,3 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-    def get_roadmap_by_project_id(self, project_id: int) -> Dict: # 수정 불가
-        """프로젝트 ID별 로드맵 데이터 조회"""
-        conn = self.get_connection()
-        if not conn:
-            return {
-                "success": False,
-                "message": "데이터베이스 연결 실패",
-                "data": []
-            }
-        
-        cursor = None
-        try:
-            cursor = conn.cursor(pymysql.cursors.DictCursor)
-            
-            # 해당 프로젝트 ID의 모든 로드맵 데이터 조회
-            query = """
-                SELECT id, redmine_version_id, project_id, project_name, version_name, 
-                       status, description, due_date, created_on, updated_on, 
-                       wiki_page_title, wiki_page_url, connected_issue_ids,
-                       created_at, updated_at
-                FROM roadmap_versions 
-                WHERE project_id = %s
-                ORDER BY created_on DESC
-            """
-            
-            cursor.execute(query, (project_id,))
-            results = cursor.fetchall()
-            
-            # 결과 데이터 정리
-            roadmap_data = []
-            for row in results:
-                roadmap_item = {
-                    "id": row.get('id'),
-                    "redmine_version_id": row.get('redmine_version_id'),
-                    "project_id": row.get('project_id'),
-                    "project_name": row.get('project_name'),
-                    "version_name": row.get('version_name'),
-                    "status": row.get('status'),
-                    "description": row.get('description'),
-                    "due_date": row.get('due_date'),
-                    "created_on": row.get('created_on'),
-                    "updated_on": row.get('updated_on'),
-                    "wiki_page_title": row.get('wiki_page_title'),
-                    "wiki_page_url": row.get('wiki_page_url'),
-                    "connected_issue_ids": row.get('connected_issue_ids'),
-                    "created_at": row.get('created_at'),
-                    "updated_at": row.get('updated_at')
-                }
-                roadmap_data.append(roadmap_item)
-            
-            return {
-                "success": True,
-                "message": f"프로젝트 ID {project_id}의 로드맵 데이터 조회 완료",
-                "data": roadmap_data,
-                "count": len(roadmap_data)
-            }
-            
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"로드맵 데이터 조회 실패: {str(e)}",
-                "data": []
-            }
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()

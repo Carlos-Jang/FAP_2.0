@@ -195,9 +195,6 @@ def get_open_roadmap_block() -> Dict:
             version_name = item.get("version_name")
             status = item.get("status")
             description = item.get("description")
-            due_date = item.get("due_date")
-            created_on = item.get("created_on")
-            updated_on = item.get("updated_on")
             wiki_page_title = item.get("wiki_page_title")
             wiki_page_url = item.get("wiki_page_url")
             connected_issue_ids = item.get("connected_issue_ids")
@@ -211,11 +208,9 @@ def get_open_roadmap_block() -> Dict:
                 # ID만 추출해서 리스트로 만들기
                 issue_ids = [int(issue_id.strip()) for issue_id in connected_issue_ids.split(',') if issue_id.strip()]
                 if issue_ids:
-                    # 각 ID별로 get_issue_by_id로 데이터 가져오기
-                    for issue_id in issue_ids:
-                        issue_detail = db.get_issue_by_id(issue_id)
-                        if issue_detail:
-                            connected_issues_detail.append(issue_detail)
+                    # 모든 ID를 한 번에 get_issues_by_ids로 데이터 가져오기
+                    issues_detail = db.get_issues_by_ids(issue_ids)
+                    connected_issues_detail.extend(issues_detail)
                     
                     # 분류된 정보 가져오기
                     if connected_issues_detail:
@@ -233,9 +228,6 @@ def get_open_roadmap_block() -> Dict:
                 "version_name": version_name,
                 "status": status,
                 "description": description,
-                "due_date": due_date,
-                "created_on": created_on,
-                "updated_on": updated_on,
                 "wiki_page_title": wiki_page_title,
                 "wiki_page_url": wiki_page_url,
                 "connected_issue_ids": connected_issue_ids,
