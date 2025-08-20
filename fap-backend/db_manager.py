@@ -363,7 +363,7 @@ class DatabaseManager:
                 'count': 0
             }
 
-    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: # 수정 불가
+    def sync_recent_issues_full_data(self, limit: int = 100) -> Dict: 
         """레드마인에서 최근 일감을 가져와서 DB에 저장 (전체 컬럼 분해 저장, 병렬 처리)"""
         print("=== 이슈 동기화 시작 ===")
         try:
@@ -531,33 +531,7 @@ class DatabaseManager:
                     elif '설비군' in field_name or 'product' in field_name.lower():
                         product = field_value
                 
-                # 시간 정보 (UTC → 한국시간 변환)
-                created_on_utc = issue.get('created_on', '')
-                updated_on_utc = issue.get('updated_on', '')
-                
-                # UTC를 한국시간으로 변환
-                created_on = ''
-                updated_on = ''
-                
-                if created_on_utc:
-                    try:
-                        from datetime import datetime, timedelta
-                        utc_dt = datetime.fromisoformat(created_on_utc.replace('Z', '+00:00'))
-                        korea_dt = utc_dt + timedelta(hours=9)
-                        created_on = korea_dt.isoformat()
-                    except Exception as e:
-                        print(f"created_on 시간 변환 실패: {created_on_utc}, 에러: {str(e)}")
-                        created_on = created_on_utc  # 변환 실패시 원본 사용
-                
-                if updated_on_utc:
-                    try:
-                        from datetime import datetime, timedelta
-                        utc_dt = datetime.fromisoformat(updated_on_utc.replace('Z', '+00:00'))
-                        korea_dt = utc_dt + timedelta(hours=9)
-                        updated_on = korea_dt.isoformat()
-                    except Exception as e:
-                        print(f"updated_on 시간 변환 실패: {updated_on_utc}, 에러: {str(e)}")
-                        updated_on = updated_on_utc  # 변환 실패시 원본 사용
+
                 
                 # 새 일감 추가 (모든 컬럼 포함)
                 cursor.execute("""
@@ -566,23 +540,20 @@ class DatabaseManager:
                         project_id, project_name, tracker_id, tracker_name,
                         status_id, status_name, is_closed, priority_id, priority_name,
                         author_id, author_name, assigned_to_id, assigned_to_name,
-                        subject, description, cost, pending, product,
-                        created_on, updated_on
+                        subject, description, cost, pending, product
                     ) VALUES (
                         %s, %s, NOW(), NOW(),
                         %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s,
-                        %s, %s
+                        %s, %s, %s, %s, %s
                     )
                 """, (
                     redmine_id, json.dumps(issue, ensure_ascii=False),
                     project_id, project_name, tracker_id, tracker_name,
                     status_id, status_name, is_closed, priority_id, priority_name,
                     author_id, author_name, assigned_to_id, assigned_to_name,
-                    subject, description, cost, pending, product,
-                    created_on, updated_on
+                    subject, description, cost, pending, product
                 ))
                 saved_count += 1
             
