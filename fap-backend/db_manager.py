@@ -1302,6 +1302,9 @@ class DatabaseManager:
             import requests
             from config import REDMINE_URL, API_KEY, CUSTOMER_PROJECT_IDS
             
+            print(f"[로드맵 동기화] 시작 - REDMINE_URL: {REDMINE_URL}")
+            print(f"[로드맵 동기화] CUSTOMER_PROJECT_IDS: {CUSTOMER_PROJECT_IDS}")
+            
             headers = {'X-Redmine-API-Key': API_KEY}
             saved_count = 0
             updated_count = 0
@@ -1310,41 +1313,55 @@ class DatabaseManager:
 
             
             # DB 연결
+            print(f"[로드맵 동기화] DB 연결 시도...")
             conn = self.get_connection()
             if not conn:
+                print(f"[로드맵 동기화] DB 연결 실패!")
                 return {
                     "success": False,
                     "error": "DB 연결 실패"
                 }
             
+            print(f"[로드맵 동기화] DB 연결 성공")
             cursor = conn.cursor()
             
             # 기존 로드맵 데이터 모두 삭제
+            print(f"[로드맵 동기화] 기존 로드맵 데이터 삭제 (TRUNCATE)")
             cursor.execute("TRUNCATE TABLE roadmap_versions")
             
             # 각 고객사 프로젝트별로 로드맵 데이터 가져오기
+            print(f"[로드맵 동기화] 프로젝트 처리 시작 - 총 {len(CUSTOMER_PROJECT_IDS)}개 프로젝트")
             for project_id in CUSTOMER_PROJECT_IDS:
                 try:
+                    print(f"[로드맵 동기화] 프로젝트 {project_id} 처리 시작")
                     # 프로젝트 정보 가져오기
                     project_url = f"{REDMINE_URL}/projects/{project_id}.json"
+                    print(f"[로드맵 동기화] 프로젝트 API 호출: {project_url}")
                     project_response = requests.get(project_url, headers=headers, timeout=10)
                     
+                    print(f"[로드맵 동기화] 프로젝트 API 응답: {project_response.status_code}")
                     if project_response.status_code != 200:
+                        print(f"[로드맵 동기화] 프로젝트 {project_id} API 실패 - 스킵")
                         continue
                     
                     project_data = project_response.json().get('project', {})
                     project_name = project_data.get('name', '')
                     project_identifier = project_data.get('identifier', '')
+                    print(f"[로드맵 동기화] 프로젝트 정보: {project_name} ({project_identifier})")
                     
                     # 프로젝트의 로드맵(버전) 정보 가져오기
                     versions_url = f"{REDMINE_URL}/projects/{project_identifier}/versions.json"
+                    print(f"[로드맵 동기화] 버전 API 호출: {versions_url}")
                     versions_response = requests.get(versions_url, headers=headers, timeout=10)
                     
+                    print(f"[로드맵 동기화] 버전 API 응답: {versions_response.status_code}")
                     if versions_response.status_code != 200:
+                        print(f"[로드맵 동기화] 프로젝트 {project_identifier} 버전 API 실패 - 스킵")
                         continue
                     
                     versions_data = versions_response.json()
                     versions = versions_data.get('versions', [])
+                    print(f"[로드맵 동기화] 프로젝트 {project_identifier} 버전 개수: {len(versions)}")
                     
                     for version in versions:
                         version_id = version.get('id')
@@ -1377,11 +1394,15 @@ class DatabaseManager:
                         # 쉼표로 구분된 ID 리스트로 변환
                         connected_issue_ids_str = ','.join(connected_issue_ids) if connected_issue_ids else ''
                         
+                        print(f"[로드맵 동기화] 버전 처리: {version_name} (ID: {version_id}, 상태: {status})")
+                        
                         # "기본설정" 또는 "기본 설정"인 경우 제외
                         if version_name.strip() in ["기본설정", "기본 설정"]:
+                            print(f"[로드맵 동기화] 기본설정 버전 제외: {version_name}")
                             continue
                         
                         # 새 데이터 삽입 (TRUNCATE 후이므로 항상 INSERT)
+                        print(f"[로드맵 동기화] DB 저장: {version_name}")
                         cursor.execute("""
                             INSERT INTO roadmap_versions 
                             (redmine_version_id, project_id, project_name, version_name, status, description,
@@ -1390,14 +1411,17 @@ class DatabaseManager:
                         """, (version_id, project_id, project_name, version_name, status, description,
                               wiki_page_title, wiki_page_url, connected_issue_ids_str, created_on, updated_on))
                         saved_count += 1
-                        
                         total_versions += 1
+                        print(f"[로드맵 동기화] 저장 완료 - 현재 총 {saved_count}개")
                 
                 except Exception as e:
+                    print(f"[로드맵 동기화] 프로젝트 {project_id} 처리 중 오류: {str(e)}")
                     continue
             
+            print(f"[로드맵 동기화] 모든 프로젝트 처리 완료")
             conn.commit()
             
+            print(f"[로드맵 동기화] 최종 결과: 총 {total_versions}개 버전, 저장 {saved_count}개")
             return {
                 "success": True,
                 "message": f"로드맵 데이터 동기화 완료. 총 {total_versions}개 버전 처리됨",
