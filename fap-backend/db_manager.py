@@ -1300,7 +1300,25 @@ class DatabaseManager:
         """로드맵 데이터 동기화 - PMS에서 로드맵 정보를 가져와서 DB에 저장"""
         try:
             import requests
+            from datetime import datetime, timezone, timedelta
             from config import REDMINE_URL, API_KEY, CUSTOMER_PROJECT_IDS
+            
+            def convert_iso_to_mysql_datetime(iso_string):
+                """ISO 8601 형식을 한국 시간 MySQL 형식으로 변환"""
+                if not iso_string:
+                    return None
+                try:
+                    # ISO 형식을 파싱 (UTC 시간)
+                    dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+                    
+                    # UTC를 한국 시간으로 변환 (UTC+9)
+                    korea_tz = timezone(timedelta(hours=9))
+                    korea_time = dt.astimezone(korea_tz)
+                    
+                    # MySQL 형식으로 변환
+                    return korea_time.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    return None
             
             print(f"[로드맵 동기화] 시작 - REDMINE_URL: {REDMINE_URL}")
             print(f"[로드맵 동기화] CUSTOMER_PROJECT_IDS: {CUSTOMER_PROJECT_IDS}")
@@ -1368,8 +1386,9 @@ class DatabaseManager:
                         version_name = version.get('name', '')
                         status = version.get('status', '')
                         description = version.get('description', '')
-                        created_on = version.get('created_on')
-                        updated_on = version.get('updated_on')
+                        # 날짜 형식 변환 (ISO → 한국 시간 MySQL 형식)
+                        created_on = convert_iso_to_mysql_datetime(version.get('created_on'))
+                        updated_on = convert_iso_to_mysql_datetime(version.get('updated_on'))
                         wiki_page_title = version.get('wiki_page_title', '')
                         
                         # 위키 페이지 URL 생성
