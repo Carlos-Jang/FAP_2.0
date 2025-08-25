@@ -30,7 +30,7 @@ from fastapi import APIRouter, Query, HTTPException, Request
 from typing import List, Dict, Optional
 from db_manager import DatabaseManager
 from config import CUSTOMER_PROJECT_IDS
-from .redmine_service import update_issue_status
+from redmine_service import update_issue_status
 
 import json
 import re
@@ -2135,7 +2135,7 @@ async def update_progress_status(request: Request): # 수정 불가
             raise HTTPException(status_code=400, detail=f"레드마인 업데이트 실패: {redmine_result.get('message')}")
         
         # 2. 레드마인에서 실제 상태 재확인 (권한 문제 등으로 실제 변경되지 않았을 수 있음)
-        from .redmine_service import fetch_redmine_issue
+        from redmine_service import fetch_redmine_issue
         updated_issue = fetch_redmine_issue(redmine_id)
         
         if not updated_issue:

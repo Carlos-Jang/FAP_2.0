@@ -25,7 +25,7 @@ API 엔드포인트:
 - 실시간 데이터 처리
 """
 
-# routers/redmine_service.py
+# redmine_service.py
 from fastapi import APIRouter
 import requests
 from fastapi import HTTPException
@@ -34,6 +34,7 @@ from fastapi import Request
 from fastapi.responses import FileResponse
 import shutil
 import os
+from typing import List, Dict
 
 # 전역 캐시 딕셔너리 선언 (파일 상단에 위치해야 함)
 
@@ -45,9 +46,8 @@ def fetch_redmine_issue(issue_id: int):  # 수정 불가
     """
     Redmine에서 이슈 전체 정보를 받아오는 헬퍼 함수
     """
-    url = f"{REDMINE_URL}/issues/{issue_id}.json"
-    headers = {"X-Redmine-API-Key": REDMINE_API_KEY}
-    resp = requests.get(url, headers=headers, timeout=10)
+    url = f"{REDMINE_URL}/issues/{issue_id}.json?key={REDMINE_API_KEY}"
+    resp = requests.get(url, timeout=10)
     if resp.status_code == 200:
         return resp.json().get("issue", {})
     else:
@@ -78,6 +78,60 @@ def get_project_name(project_id: int):  # 수정 불가
         project = resp.json().get("project", {})
         return project.get('name', '')
     return None
+
+def fetch_redmine_issues(limit: int = 50, offset: int = 0) -> List[Dict]:
+    """
+    Redmine에서 일괄 조회로 일감들을 가져오는 함수
+    필터링 없이 최근 일감들을 반환
+    
+    Args:
+        limit (int): 가져올 일감 개수 (기본값: 50, 최대: 100)
+        offset (int): 시작 위치 (페이지네이션용, 기본값: 0)
+    
+    Returns:
+        List[Dict]: 일감 데이터 리스트
+    """
+    try:
+        url = f"{REDMINE_URL}/issues.json"
+        params = {
+            "key": REDMINE_API_KEY,
+            "limit": min(limit, 100),  # 최대 100개로 제한
+            "offset": offset,  # 페이지네이션용 시작 위치
+            "sort": "created_on:desc"  # 최신순 정렬
+        }
+        
+        response = requests.get(url, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            issues = data.get("issues", [])
+            
+            # FAP 형식으로 변환
+            formatted_issues = []
+            for issue in issues:
+                formatted_issue = {
+                    "redmine_id": issue.get("id"),
+                    "subject": issue.get("subject", ""),
+                    "description": issue.get("description", ""),
+                    "status_name": issue.get("status", {}).get("name", ""),
+                    "tracker_name": issue.get("tracker", {}).get("name", ""),
+                    "author_name": issue.get("author", {}).get("name", ""),
+                    "assigned_to_name": issue.get("assigned_to", {}).get("name", ""),
+                    "created_at": issue.get("created_on", ""),
+                    "updated_at": issue.get("updated_on", ""),
+                    "is_closed": 1 if issue.get("status", {}).get("is_closed", False) else 0,
+                    "product": []  # Redmine에는 product 정보가 없으므로 빈 배열
+                }
+                formatted_issues.append(formatted_issue)
+            
+            return formatted_issues
+        else:
+            print(f"Redmine API 호출 실패: {response.status_code}")
+            return []
+            
+    except Exception as e:
+        print(f"fetch_redmine_issues 오류: {str(e)}")
+        return []
 
 # ===== Redmine 관련 메서드들 FAP to PMS =====
 
@@ -249,7 +303,7 @@ def make_report_download():
     엑셀 템플릿 파일(templates/Report.xlsx)을 복사해서 사용자에게 반환
     (아직 데이터 채우기 없이 파일 복사만)
     """
-    template_path = os.path.join(os.path.dirname(__file__), '../templates/Report.xlsx')
-    temp_copy_path = os.path.join(os.path.dirname(__file__), '../templates/Report_temp.xlsx')
+    template_path = os.path.join(os.path.dirname(__file__), 'templates/Report.xlsx')
+    temp_copy_path = os.path.join(os.path.dirname(__file__), 'templates/Report_temp.xlsx')
     shutil.copyfile(template_path, temp_copy_path)
-    return FileResponse(temp_copy_path, filename='Report.xlsx', media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') 
+    return FileResponse(temp_copy_path, filename='Report.xlsx', media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

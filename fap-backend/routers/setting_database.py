@@ -77,6 +77,57 @@ async def check_user_api_key(login: str): # 수정 불가
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API 키 조회 실패: {str(e)}")
 
+@router.post("/save-user-products")
+async def save_user_products(request: Request):
+    """사용자 Product 설정 저장"""
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        selected_products = data.get('selected_products', [])
+
+        if not user_id:
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: user_id")
+
+        # DB 매니저를 통한 Product 설정 저장
+        db = DatabaseManager()
+        result = db.save_user_products(user_id, selected_products)
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("message", "Product 설정 저장 실패"))
+        
+        return {
+            "success": True,
+            "message": result.get("message", "Product 설정이 성공적으로 저장되었습니다."),
+            "data": result.get("data", {})
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Product 설정 저장 실패: {str(e)}")
+
+@router.get("/get-user-products")
+async def get_user_products(user_id: str = Query(..., description="사용자 ID")):
+    """사용자 Product 설정 조회"""
+    try:
+        if not user_id:
+            raise HTTPException(status_code=400, detail="필수 파라미터가 누락되었습니다: user_id")
+
+        # DB 매니저를 통한 Product 설정 조회
+        db = DatabaseManager()
+        result = db.get_user_products(user_id)
+        
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", ""),
+            "data": result.get("data", {})
+        }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Product 설정 조회 실패: {str(e)}")
+
 @router.post("/sync-statuses")
 async def sync_issue_statuses(): # 수정 불가
     """이슈 상태 목록 동기화"""

@@ -38,10 +38,11 @@ API 엔드포인트:
 # main.py
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from routers.redmine_service import router as PMS_router
+from redmine_service import router as PMS_router
 from routers.issue_database import router as AE_issues_router
 from routers.setting_database import router as settings_router
 from routers.main_database import router as main_router
+from routers.ae_make_report_data import router as ae_make_report_router
 from pydantic import BaseModel
 import requests
 
@@ -64,6 +65,7 @@ app.include_router(PMS_router)
 app.include_router(AE_issues_router)
 app.include_router(settings_router)
 app.include_router(main_router)
+app.include_router(ae_make_report_router)
 
 class LoginRequest(BaseModel):
     id: str

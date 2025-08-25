@@ -94,6 +94,108 @@ class DatabaseManager:
                 print(f"   로컬 환경 DB 연결도 실패: {str(local_e)}")
                 return None
     
+    def save_user_products(self, user_id: str, selected_products: List[str]) -> Dict:
+        """사용자 Product 설정 저장"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            cursor = conn.cursor()
+            
+            # 사용자 정보 조회 (user_api_keys 테이블에서)
+            cursor.execute("""
+                SELECT firstname, lastname, user_name 
+                FROM user_api_keys 
+                WHERE user_id = %s
+            """, (user_id,))
+            
+            user_info = cursor.fetchone()
+            if not user_info:
+                return {"success": False, "message": "사용자 정보를 찾을 수 없습니다"}
+            
+            firstname, lastname, user_name = user_info
+            
+            # Product 설정을 JSON 형태로 변환
+            product_setting_json = json.dumps(selected_products, ensure_ascii=False)
+            
+            # user_setting 테이블에 저장 (UPSERT)
+            cursor.execute("""
+                INSERT INTO user_setting (user_id, firstname, lastname, user_name, product_setting, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                product_setting = VALUES(product_setting),
+                updated_at = NOW()
+            """, (user_id, firstname, lastname, user_name, product_setting_json))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            return {
+                "success": True,
+                "message": "Product 설정이 성공적으로 저장되었습니다",
+                "data": {
+                    "user_id": user_id,
+                    "selected_products": selected_products,
+                    "saved_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }
+            
+        except Exception as e:
+            print(f"Product 설정 저장 오류: {str(e)}")
+            return {"success": False, "message": f"Product 설정 저장 실패: {str(e)}"}
+
+    def get_user_products(self, user_id: str) -> Dict:
+        """사용자 Product 설정 조회"""
+        try:
+            conn = self.get_connection()
+            if not conn:
+                return {"success": False, "message": "데이터베이스 연결 실패"}
+            
+            cursor = conn.cursor()
+            
+            # user_setting 테이블에서 Product 설정 조회
+            cursor.execute("""
+                SELECT product_setting 
+                FROM user_setting 
+                WHERE user_id = %s
+            """, (user_id,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if result:
+                product_setting_json = result[0]
+                if product_setting_json:
+                    selected_products = json.loads(product_setting_json)
+                else:
+                    selected_products = []
+                
+                return {
+                    "success": True,
+                    "message": "Product 설정을 성공적으로 조회했습니다",
+                    "data": {
+                        "user_id": user_id,
+                        "selected_products": selected_products
+                    }
+                }
+            else:
+                # 설정이 없는 경우 빈 배열 반환
+                return {
+                    "success": True,
+                    "message": "Product 설정이 없습니다",
+                    "data": {
+                        "user_id": user_id,
+                        "selected_products": []
+                    }
+                }
+            
+        except Exception as e:
+            print(f"Product 설정 조회 오류: {str(e)}")
+            return {"success": False, "message": f"Product 설정 조회 실패: {str(e)}"}
+
     def update_projects_table_structure(self) -> bool:  # 수정 불가
         """프로젝트 테이블 구조를 7개 컬럼으로 업데이트"""
         conn = self.get_connection()
