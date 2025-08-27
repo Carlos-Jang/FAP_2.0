@@ -22,36 +22,78 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 // 마크다운 설명을 파싱하여 모든 섹션을 추출하는 헬퍼 함수
-function parseDescription(description: string): { problem: string; cause: string; action: string; result: string; note: string; atiReport: string } {
+function parseDescription(description: string): { 
+  hasStructuredContent: boolean;
+  problem: string; 
+  cause: string; 
+  action: string; 
+  result: string; 
+  note: string; 
+  atiReport: string; 
+  fullContent: string;
+} {
   if (!description) {
-    return { problem: '', cause: '', action: '', result: '', note: '', atiReport: '' };
+    return { 
+      hasStructuredContent: false,
+      problem: '', 
+      cause: '', 
+      action: '', 
+      result: '', 
+      note: '', 
+      atiReport: '',
+      fullContent: ''
+    };
   }
 
-  // 문제 추출
-  const problemMatch = description.match(/### 문제\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const problem = problemMatch ? problemMatch[1].trim() : '';
+  // 문제 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 다음 섹션까지)
+  const problemMatchWithTilde = description.match(/### 문제\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const problemMatchWithoutTilde = description.match(/### 문제\s*([\s\S]*?)(?=\s*### 원인|$)/);
+  const problem = problemMatchWithTilde ? problemMatchWithTilde[1].trim() : 
+                  problemMatchWithoutTilde ? problemMatchWithoutTilde[1].trim() : '';
 
-  // 원인 추출
-  const causeMatch = description.match(/### 원인\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const cause = causeMatch ? causeMatch[1].trim() : '';
+  // 원인 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 다음 섹션까지)
+  const causeMatchWithTilde = description.match(/### 원인\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const causeMatchWithoutTilde = description.match(/### 원인\s*([\s\S]*?)(?=\s*### 조치|$)/);
+  const cause = causeMatchWithTilde ? causeMatchWithTilde[1].trim() : 
+                causeMatchWithoutTilde ? causeMatchWithoutTilde[1].trim() : '';
 
-  // 조치 추출
-  const actionMatch = description.match(/### 조치\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const action = actionMatch ? actionMatch[1].trim() : '';
+  // 조치 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 다음 섹션까지)
+  const actionMatchWithTilde = description.match(/### 조치\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const actionMatchWithoutTilde = description.match(/### 조치\s*([\s\S]*?)(?=\s*### 결과|$)/);
+  const action = actionMatchWithTilde ? actionMatchWithTilde[1].trim() : 
+                 actionMatchWithoutTilde ? actionMatchWithoutTilde[1].trim() : '';
 
-  // 결과 추출
-  const resultMatch = description.match(/### 결과\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const result = resultMatch ? resultMatch[1].trim() : '';
+  // 결과 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 다음 섹션까지)
+  const resultMatchWithTilde = description.match(/### 결과\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const resultMatchWithoutTilde = description.match(/### 결과\s*([\s\S]*?)(?=\s*### 특이사항|$)/);
+  const result = resultMatchWithTilde ? resultMatchWithTilde[1].trim() : 
+                 resultMatchWithoutTilde ? resultMatchWithoutTilde[1].trim() : '';
 
-  // 특이사항 추출
-  const noteMatch = description.match(/### 특이사항\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const note = noteMatch ? noteMatch[1].trim() : '';
+  // 특이사항 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 다음 섹션까지)
+  const noteMatchWithTilde = description.match(/### 특이사항\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const noteMatchWithoutTilde = description.match(/### 특이사항\s*([\s\S]*?)(?=\s*### ATI 내부 보고|$)/);
+  const note = noteMatchWithTilde ? noteMatchWithTilde[1].trim() : 
+               noteMatchWithoutTilde ? noteMatchWithoutTilde[1].trim() : '';
 
-  // ATI 내부 공유 추출
-  const atiReportMatch = description.match(/### ATI 내부 공유\s*~~~\s*([\s\S]*?)\s*~~~/);
-  const atiReport = atiReportMatch ? atiReportMatch[1].trim() : '';
+  // ATI 내부 보고 추출 (~~~ 구분자가 있으면 그 안의 내용, 없으면 끝까지)
+  const atiReportMatchWithTilde = description.match(/### ATI 내부 보고\s*~~~\s*([\s\S]*?)\s*~~~/);
+  const atiReportMatchWithoutTilde = description.match(/### ATI 내부 보고\s*([\s\S]*?)$/);
+  const atiReport = atiReportMatchWithTilde ? atiReportMatchWithTilde[1].trim() : 
+                    atiReportMatchWithoutTilde ? atiReportMatchWithoutTilde[1].trim() : '';
 
-  return { problem, cause, action, result, note, atiReport };
+  // 구조화된 내용이 있는지 확인 (문제, 원인, 조치, 결과 중 하나라도 내용이 있으면 구조화된 것으로 판단)
+  const hasStructuredContent = !!(problem || cause || action || result || note || atiReport);
+
+  return { 
+    hasStructuredContent,
+    problem, 
+    cause, 
+    action, 
+    result, 
+    note, 
+    atiReport,
+    fullContent: description
+  };
 }
 
 // 간단한 마크다운을 HTML로 변환하는 함수
@@ -116,6 +158,7 @@ export default function MainPage() {
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [wikiAttachments, setWikiAttachments] = useState<any[]>([]);
   const [imageDataUrls, setImageDataUrls] = useState<{[key: number]: string}>({});
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -217,6 +260,15 @@ export default function MainPage() {
 
   // 모달 열기 함수
   const handleOpenModal = (roadmap: RoadmapData) => {
+    // Setup이 포함된 경우 셋업 모달 열기 (대소문자 구분 없이)
+    const versionName = roadmap.version_name.toLowerCase();
+    if (versionName.includes('setup') || versionName.includes('set up')) {
+      setSelectedRoadmap(roadmap);
+      setIsSetupModalOpen(true);
+      return;
+    }
+    
+    // 일반 로드맵 모달 열기
     setSelectedRoadmap(roadmap);
     setIsModalOpen(true);
     setWikiContent(''); // 위키 내용 초기화
@@ -942,162 +994,489 @@ export default function MainPage() {
              </div>
            </div>
          </div>
-       )}
+               )}
 
-      {/* 이슈 상세 모달 */}
-      {isIssueModalOpen && selectedIssue && (
-        <div
+      {/* 셋업 모달 */}
+      {isSetupModalOpen && selectedRoadmap && (
+        <div 
           style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10001
+            alignItems: 'center',
+            zIndex: 1000
           }}
-          onClick={() => {
-            setIsIssueModalOpen(false);
-            setSelectedIssue(null);
-          }}
+          onClick={() => setIsSetupModalOpen(false)}
         >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '600px',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              position: 'relative',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 닫기 버튼 */}
-            <button
-              onClick={() => {
-                setIsIssueModalOpen(false);
-                setSelectedIssue(null);
-              }}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#666',
-                width: '32px',
-                height: '32px',
+                     <div 
+             style={{
+               backgroundColor: 'white',
+               borderRadius: '16px',
+               width: '90vw',
+               height: '85vh',
+               overflow: 'hidden',
+               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+               border: '1px solid #E2E8F0',
+               display: 'flex',
+               flexDirection: 'column'
+             }}
+             onClick={(e) => e.stopPropagation()}
+           >
+                           {/* 헤더 레이어 */}
+              <div style={{
+                padding: '20px 32px 16px 32px',
+                borderBottom: '2px solid #F1F5F9',
+                background: 'white'
+              }}>
+               <div style={{
+                 display: 'flex',
+                 justifyContent: 'space-between',
+                 alignItems: 'flex-start'
+               }}>
+                 <div>
+                   <div style={{
+                     display: 'flex',
+                     justifyContent: 'space-between',
+                     alignItems: 'center',
+                     marginBottom: '8px'
+                   }}>
+                     <h2 style={{ 
+                       margin: 0, 
+                       color: '#1E293B', 
+                       fontSize: '28px',
+                       fontWeight: 'bold'
+                     }}>
+                       {selectedRoadmap.version_name}
+                     </h2>
+                                           <div style={{
+                        fontSize: '16px',
+                        color: '#64748B',
+                        fontWeight: '500',
+                        display: 'flex',
+                        gap: '8px',
+                        marginLeft: '50px',
+                        marginTop: '25px'
+                      }}>
+                       <span>{selectedRoadmap.project_name}</span>
+                       <span style={{ color: '#94A3B8' }}>•</span>
+                       <span>시작일: {selectedRoadmap.created_at ? new Date(selectedRoadmap.created_at).toLocaleDateString() : '-'}</span>
+                     </div>
+                   </div>
+                 </div>
+                 <button
+                   onClick={() => setIsSetupModalOpen(false)}
+                   style={{
+                     background: 'none',
+                     border: 'none',
+                     fontSize: '28px',
+                     cursor: 'pointer',
+                     color: '#94A3B8',
+                     padding: '8px',
+                     borderRadius: '50%',
+                     width: '40px',
+                     height: '40px',
+                     display: 'flex',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+                     transition: 'all 0.2s ease'
+                   }}
+                   onMouseEnter={(e) => {
+                     e.currentTarget.style.backgroundColor = '#F1F5F9';
+                     e.currentTarget.style.color = '#64748B';
+                   }}
+                   onMouseLeave={(e) => {
+                     e.currentTarget.style.backgroundColor = 'transparent';
+                     e.currentTarget.style.color = '#94A3B8';
+                   }}
+                 >
+                   ×
+                 </button>
+               </div>
+             </div>
+
+                           {/* 바디 레이어 */}
+              <div style={{
+                flex: 1,
+                padding: '24px 32px 32px 32px',
+                overflowY: 'auto',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f0f0f0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              ×
-            </button>
+                flexDirection: 'column',
+                gap: '20px',
+                background: '#28313b',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#64748B #28313b'
+              }}>
+               {/* 간트차트 영역 */}
+               <div style={{ 
+                 padding: '20px',
+                 background: '#F8FAFC',
+                 borderRadius: '12px',
+                 border: '1px solid #E2E8F0'
+               }}>
+                 {(() => {
+                   // Setup 관련 일감들 수집
+                   const setupIssues: any[] = [];
+                   selectedRoadmap.connected_issues_analysis?.type_list?.forEach((typeItem: any) => {
+                     if (typeItem.tracker_name.toLowerCase().includes('setup')) {
+                       typeItem.setup_status_details?.forEach((statusItem: any) => {
+                         statusItem.issue_details?.forEach((issue: any) => {
+                           setupIssues.push({
+                             ...issue,
+                             status_name: statusItem.status_name
+                           });
+                         });
+                       });
+                     }
+                   });
 
-            {/* 모달 헤더 */}
-            <div style={{ marginBottom: '20px', paddingRight: '40px' }}>
-              <a
-                href={`https://pms.ati2000.co.kr/issues/${selectedIssue.redmine_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ 
-                  fontSize: '1.2rem', 
-                  fontWeight: 600, 
-                  color: '#2196F3',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  transition: 'color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#1976D2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#2196F3';
-                }}
-              >
-                #{selectedIssue.redmine_id}
-              </a>
-            </div>
+                   if (setupIssues.length === 0) {
+                     return (
+                       <div style={{
+                         textAlign: 'center',
+                         padding: '40px 20px',
+                         color: '#64748B',
+                         background: 'white',
+                         borderRadius: '8px',
+                         border: '1px solid #E2E8F0'
+                       }}>
+                         <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
+                         <div>간트차트를 표시할 일감이 없습니다</div>
+                       </div>
+                     );
+                   }
 
-            {/* 일감 정보 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* 제목 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>제목</div>
-                <div style={{ fontSize: '1.1rem', color: '#222', lineHeight: '1.4' }}>
-                  {selectedIssue.subject}
-                </div>
-              </div>
+                   // 등록된 일감들의 날짜 범위 계산
+                   const dates = setupIssues
+                     .map(issue => new Date(issue.created_at))
+                     .filter(date => !isNaN(date.getTime()));
+                   
+                   if (dates.length === 0) {
+                     return (
+                       <div style={{
+                         textAlign: 'center',
+                         padding: '40px 20px',
+                         color: '#64748B',
+                         background: 'white',
+                         borderRadius: '8px',
+                         border: '1px solid #E2E8F0'
+                       }}>
+                         <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
+                         <div>간트차트를 표시할 일감이 없습니다</div>
+                       </div>
+                     );
+                   }
+                   
+                   const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+                   const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                   
+                   // 최소 날짜부터 1달 후까지 (단, 일감이 작성된 최대 날짜가 1달을 넘으면 그 날짜까지)
+                   const startDate = new Date(minDate);
+                   const oneMonthLater = new Date(minDate);
+                   oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+                   
+                   const endDate = maxDate > oneMonthLater ? maxDate : oneMonthLater;
+                   
+                   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                   const days = totalDays;
 
-              {/* 상태 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>상태</div>
+                   // 5개 Setup 단계
+                   const setupStages = [
+                     '[AE][Setup] 반입&레벨링',
+                     '[AE][Setup] 기초 Setup',
+                     '[AE][Setup] TTTM',
+                     '[AE][Setup] 자동화',
+                     '[AE][Setup] Setup 완료'
+                   ];
+
+                   return (
+                     <div style={{
+                       background: 'white',
+                       borderRadius: '8px',
+                       border: '1px solid #E2E8F0',
+                       overflow: 'auto',
+                       maxHeight: '400px'
+                     }}>
+                       {/* 간트차트 헤더 - 동적 날짜 표시 */}
+                       <div style={{
+                         display: 'grid',
+                         gridTemplateColumns: `150px repeat(${days}, 1fr)`,
+                         borderBottom: '2px solid #E2E8F0',
+                         background: '#F8FAFC'
+                       }}>
+                         <div style={{
+                           padding: '12px',
+                           fontWeight: '600',
+                           color: '#1E293B',
+                           borderRight: '1px solid #E2E8F0'
+                         }}>
+                           
+                         </div>
+                         
+                         {/* 동적 날짜 헤더 */}
+                         {Array.from({ length: days }, (_, dayIndex) => {
+                           const currentDate = new Date(startDate);
+                           currentDate.setDate(currentDate.getDate() + dayIndex);
+                           return (
+                             <div key={`day-${dayIndex}`} style={{
+                               padding: '4px 2px',
+                               textAlign: 'center',
+                               fontSize: '11px',
+                               color: '#64748B',
+                               borderRight: '1px solid #E2E8F0',
+                               minWidth: '20px'
+                             }}>
+                               {currentDate.getDate()}
+                             </div>
+                           );
+                         })}
+                       </div>
+
+                       {/* 간트차트 바디 */}
+                       {setupStages.map((stage, stageIndex) => {
+                         const stageIssues = setupIssues.filter(issue => issue.status_name === stage);
+                         
+                         return (
+                           <div key={stage} style={{
+                             display: 'grid',
+                             gridTemplateColumns: `150px repeat(${days}, 1fr)`,
+                             borderBottom: '1px solid #E2E8F0',
+                             minHeight: '30px'
+                           }}>
+                             {/* 단계명 */}
+                             <div style={{
+                               padding: '6px',
+                               fontWeight: '500',
+                               color: '#1E293B',
+                               borderRight: '1px solid #E2E8F0',
+                               background: '#F8FAFC',
+                               display: 'flex',
+                               alignItems: 'center',
+                               fontSize: '14px'
+                             }}>
+                               {stage.replace('[AE][Setup] ', '')}
+                             </div>
+                             
+                             {/* 일감 바 차트 - 동적 날짜 */}
+                             {Array.from({ length: days }, (_, dayIndex) => {
+                               const currentDate = new Date(startDate);
+                               currentDate.setDate(currentDate.getDate() + dayIndex);
+                               const dayIssues = stageIssues.filter(issue => {
+                                 const issueDate = new Date(issue.created_at);
+                                 return issueDate.getDate() === currentDate.getDate() && 
+                                        issueDate.getMonth() === currentDate.getMonth() &&
+                                        issueDate.getFullYear() === currentDate.getFullYear();
+                               });
+
+                               return (
+                                 <div key={`day-${dayIndex}`} style={{
+                                   padding: '4px 2px',
+                                   borderRight: '1px solid #E2E8F0',
+                                   position: 'relative',
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   minWidth: '20px',
+                                   backgroundColor: dayIssues.length > 0 ? '#10B981' : 'transparent'
+                                 }}>
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         );
+                       })}
+                     </div>
+                   );
+                 })()}
+               </div>
+
+                               {/* Status별 일감 카드 출력 */}
                 <div style={{ 
-                  display: 'inline-block',
-                  padding: '4px 12px',
-                  borderRadius: '16px',
-                  fontSize: '0.9rem',
-                  fontWeight: 500,
-                  color: 'white',
-                  background: selectedIssue.is_closed === 1 ? '#28a745' : '#dc3545'
+                  padding: '20px',
+                  background: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  flex: 1,
+                  overflow: 'auto',
+                  minHeight: '600px'
                 }}>
-                  {selectedIssue.is_closed === 1 ? '완료' : '진행중'}
-                </div>
-              </div>
-
-              {/* 담당자 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>담당자</div>
-                <div style={{ fontSize: '1rem', color: '#222' }}>
-                  {selectedIssue.assigned_to_name || '지정되지 않음'}
-                </div>
-              </div>
-
-              {/* 설명 */}
-              {selectedIssue.description && (
-                <div>
-                  <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>설명</div>
-                  <div style={{ 
-                    color: '#222', 
-                    lineHeight: '1.6',
-                    wordBreak: 'break-word',
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}>
-                    {selectedIssue.description}
-                  </div>
-                </div>
-              )}
-
-              {/* 생성일 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>생성일</div>
-                <div style={{ fontSize: '1rem', color: '#222' }}>
-                  {selectedIssue.created_at ? new Date(selectedIssue.created_at).toLocaleDateString('ko-KR') : '정보 없음'}
-                </div>
-              </div>
-            </div>
-          </div>
+                 {selectedRoadmap.connected_issues_analysis?.type_list?.map((typeItem: any) => {
+                   // Setup 관련 타입만 필터링
+                   if (typeItem.tracker_name.toLowerCase().includes('setup')) {
+                     // 고정된 5가지 status 순서
+                     const statusOrder = [
+                       '[AE][Setup] 반입&레벨링',
+                       '[AE][Setup] 기초 Setup',
+                       '[AE][Setup] TTTM',
+                       '[AE][Setup] 자동화',
+                       '[AE][Setup] Setup 완료'
+                     ];
+                     
+                     return (
+                       <div key={typeItem.tracker_name}>
+                         {/* Status별 카드 그리드 - 고정된 순서로 표시 */}
+                         <div style={{
+                           display: 'grid',
+                           gridTemplateColumns: 'repeat(5, 1fr)',
+                           gap: '16px',
+                           height: 'fit-content'
+                         }}>
+                           {statusOrder.map((statusName) => {
+                             // 해당 status의 데이터 찾기
+                             const statusItem = typeItem.setup_status_details?.find((item: any) => item.status_name === statusName);
+                             const issueDetails = statusItem?.issue_details || [];
+                             const totalCount = statusItem?.total_count || 0;
+                             
+                             return (
+                               <div key={statusName} style={{
+                                 background: 'white',
+                                 borderRadius: '12px',
+                                 padding: '20px',
+                                 border: '1px solid #E2E8F0',
+                                 boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                                 transition: 'all 0.2s ease',
+                                 height: '520px',
+                                 display: 'flex',
+                                 flexDirection: 'column'
+                               }}>
+                                 {/* Status 헤더 */}
+                                 <div style={{
+                                   display: 'flex',
+                                   justifyContent: 'space-between',
+                                   alignItems: 'center',
+                                   marginBottom: '16px',
+                                   paddingBottom: '12px',
+                                   borderBottom: '2px solid #F1F5F9'
+                                 }}>
+                                   <h4 style={{
+                                     fontSize: '16px',
+                                     fontWeight: '600',
+                                     color: '#1E293B',
+                                     margin: 0
+                                   }}>
+                                     {statusName}
+                                   </h4>
+                                   <span style={{
+                                     background: totalCount > 0 ? '#3B82F6' : '#94A3B8',
+                                     color: 'white',
+                                     padding: '4px 12px',
+                                     borderRadius: '20px',
+                                     fontSize: '14px',
+                                     fontWeight: '500'
+                                   }}>
+                                     {totalCount}건
+                                   </span>
+                                 </div>
+                                 
+                                 {/* 일감 카드 리스트 */}
+                                 <div style={{ 
+                                   flex: 1,
+                                   overflow: 'auto',
+                                   marginTop: '16px'
+                                 }}>
+                                   {issueDetails.length > 0 ? (
+                                     issueDetails.map((issue: any, index: number) => (
+                                       <div key={index} style={{
+                                         background: '#F8FAFC',
+                                         borderRadius: '8px',
+                                         padding: '16px',
+                                         marginBottom: '12px',
+                                         border: '1px solid #E2E8F0',
+                                         transition: 'all 0.2s ease',
+                                         cursor: 'pointer'
+                                       }}
+                                       onMouseEnter={(e) => {
+                                         e.currentTarget.style.transform = 'translateY(-2px)';
+                                         e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.1)';
+                                       }}
+                                       onMouseLeave={(e) => {
+                                         e.currentTarget.style.transform = 'translateY(0)';
+                                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                                       }}
+                                       onClick={() => {
+                                         setSelectedIssue(issue);
+                                         setIsIssueModalOpen(true);
+                                       }}>
+                                         {/* 일감 정보 */}
+                                         <div style={{
+                                           display: 'flex',
+                                           justifyContent: 'space-between',
+                                           alignItems: 'center',
+                                           fontSize: '13px',
+                                           color: '#64748B',
+                                           marginBottom: '8px'
+                                         }}>
+                                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                             <span style={{
+                                               color: '#3B82F6',
+                                               fontWeight: 'bold',
+                                               fontSize: '14px'
+                                             }}>#{issue.redmine_id}</span>
+                                           </div>
+                                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                             <span>👤 {issue.author_name}</span>
+                                             <span>📅 {issue.created_at ? new Date(issue.created_at).toLocaleDateString() : '-'}</span>
+                                           </div>
+                                         </div>
+                                         
+                                         {/* 일감 제목 */}
+                                         <div style={{
+                                           fontSize: '15px',
+                                           fontWeight: '600',
+                                           color: '#1E293B',
+                                           lineHeight: '1.4'
+                                         }}>
+                                           {issue.subject}
+                                         </div>
+                                       </div>
+                                     ))
+                                   ) : (
+                                     <div style={{
+                                       textAlign: 'center',
+                                       padding: '40px 20px',
+                                       color: '#94A3B8',
+                                       fontSize: '14px'
+                                     }}>
+                                       <div style={{ fontSize: '24px', marginBottom: '8px' }}>📝</div>
+                                       <div>일감이 없습니다</div>
+                                     </div>
+                                   )}
+                                 </div>
+                               </div>
+                             );
+                           })}
+                         </div>
+                       </div>
+                     );
+                   }
+                   return null;
+                 })}
+                 
+                 {/* Setup 데이터가 없는 경우 */}
+                 {(!selectedRoadmap.connected_issues_analysis?.type_list?.some((typeItem: any) => 
+                   typeItem.tracker_name.toLowerCase().includes('setup')
+                 )) && (
+                   <div style={{
+                     textAlign: 'center',
+                     padding: '40px 20px',
+                     color: '#64748B'
+                   }}>
+                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+                     <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                       Setup 데이터가 없습니다
+                     </div>
+                     <div style={{ fontSize: '14px' }}>
+                       이 프로젝트에는 Setup 관련 일감이 없습니다.
+                     </div>
+                   </div>
+                 )}
+               </div>
+             </div>
+           </div>
         </div>
       )}
 
@@ -1125,176 +1504,387 @@ export default function MainPage() {
             style={{
               background: '#fff',
               borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '600px',
+              width: '80vw',
               maxHeight: '80vh',
-              overflowY: 'auto',
               position: 'relative',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+              boxShadow: 'var(--shadow-dark)',
+              display: 'flex',
+              flexDirection: 'column'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 닫기 버튼 */}
-            <button
-              onClick={() => {
-                setIsIssueModalOpen(false);
-                setSelectedIssue(null);
-              }}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#666',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f0f0f0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              ×
-            </button>
-
-            {/* 모달 헤더 */}
-            <div style={{ marginBottom: '20px', paddingRight: '40px' }}>
-              <a
-                href={`https://pms.ati2000.co.kr/issues/${selectedIssue.redmine_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ 
-                  fontSize: '1.2rem', 
-                  fontWeight: 600, 
-                  color: '#2196F3',
-                  textDecoration: 'none',
+            {/* 상부 레이어 - 헤더 */}
+            <div style={{
+              background: 'var(--color-surface)',
+              borderRadius: '12px 12px 0 0',
+              padding: '20px 24px',
+              color: 'var(--color-text)',
+              position: 'relative',
+              borderBottom: '1px solid var(--color-border)'
+            }}>
+              {/* 닫기 버튼 */}
+              <button
+                onClick={() => {
+                  setIsIssueModalOpen(false);
+                  setSelectedIssue(null);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
                   cursor: 'pointer',
-                  transition: 'color 0.2s'
+                  color: 'var(--color-text)',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'background-color 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#1976D2';
+                  e.currentTarget.style.backgroundColor = 'var(--color-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#2196F3';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                #{selectedIssue.redmine_id}
-              </a>
+                ×
+              </button>
+
+              {/* 헤더 내용 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '16px', 
+                flexWrap: 'wrap',
+                paddingRight: '40px'
+              }}>
+                {/* 일감 번호와 메타 정보 */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '16px', 
+                  flexWrap: 'wrap'
+                }}>
+                  <a
+                    href={`https://pms.ati2000.co.kr/issues/${selectedIssue.redmine_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ 
+                      fontSize: '1.4rem', 
+                      fontWeight: 700, 
+                      color: '#007bff',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#0056b3';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#007bff';
+                    }}
+                  >
+                    #{selectedIssue.redmine_id}
+                  </a>
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    flexWrap: 'wrap',
+                    fontSize: '1.1rem',
+                    color: 'var(--color-text)'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: 'var(--color-accent)',
+                      borderRadius: '6px',
+                      border: '1px solid var(--color-border)'
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>📅</span>
+                      <span>{selectedIssue.created_at && new Date(selectedIssue.created_at).toLocaleDateString('ko-KR')}</span>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: 'var(--color-accent)',
+                      borderRadius: '6px',
+                      border: '1px solid var(--color-border)'
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>🏢</span>
+                      <span>{selectedIssue.project_name}</span>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: 'var(--color-accent)',
+                      borderRadius: '6px',
+                      border: '1px solid var(--color-border)'
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>👤</span>
+                      <span>{selectedIssue.author_name}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* 일감 정보 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* 제목 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>제목</div>
-                <div style={{ fontSize: '1.1rem', color: '#222', lineHeight: '1.4' }}>
-                  {selectedIssue.subject}
-                </div>
-              </div>
+            {/* 하부 레이어 */}
+            <div style={{
+              background: '#28313b',
+              borderRadius: '0 0 12px 12px',
+              padding: '24px',
+              overflowY: 'auto',
+              flex: 1
+            }}>
+              {/* 하부 레이어 - 내용 */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '8px',
+                padding: '20px',
+                height: '100%'
+              }}>
+                {/* 일감 정보 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 제목 */}
+                  <div style={{ 
+                    fontSize: '1.3rem', 
+                    fontWeight: 700, 
+                    color: '#000000', 
+                    lineHeight: '1.4',
+                    padding: '16px 0'
+                  }}>
+                    {selectedIssue.subject}
+                  </div>
 
-              {/* 문제 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>문제</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).problem}
-                </div>
-              </div>
+                  {(() => {
+                    const parsedDescription = parseDescription(selectedIssue.description);
+                    
+                    if (parsedDescription.hasStructuredContent) {
+                      // 구조화된 내용이 있는 경우 - 표 형태로 표시
+                      return (
+                        <div style={{ 
+                          border: '1px solid #333333', 
+                          borderRadius: '8px', 
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+                        }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              {/* 문제 */}
+                              <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  문제
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.problem}
+                                </td>
+                              </tr>
 
-              {/* 원인 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>원인</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).cause}
-                </div>
-              </div>
+                              {/* 원인 */}
+                              <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  원인
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.cause}
+                                </td>
+                              </tr>
 
-              {/* 조치 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>조치</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).action}
-                </div>
-              </div>
+                              {/* 조치 */}
+                              <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  조치
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.action}
+                                </td>
+                              </tr>
 
-              {/* 결과 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>결과</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).result}
-                </div>
-              </div>
+                              {/* 결과 */}
+                              <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  결과
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.result}
+                                </td>
+                              </tr>
 
-              {/* 특이사항 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>특이사항</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).note}
-                </div>
-              </div>
+                              {/* 특이사항 */}
+                              <tr style={{ borderBottom: '1px solid #333333' }}>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  특이사항
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.note}
+                                </td>
+                              </tr>
 
-              {/* ATI 내부 보고 */}
-              <div>
-                <div style={{ fontWeight: 600, color: '#555', marginBottom: '8px' }}>ATI 내부 보고</div>
-                <div style={{ 
-                  color: '#222', 
-                  lineHeight: '1.6',
-                  wordBreak: 'break-word',
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  {parseDescription(selectedIssue.description).atiReport}
+                              {/* ATI 내부 보고 */}
+                              <tr>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  ATI 내부 보고
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.atiReport}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    } else {
+                      // 구조화된 내용이 없는 경우 - 전체 내용을 하나의 섹션으로 표시
+                      return (
+                        <div style={{ 
+                          border: '1px solid #333333', 
+                          borderRadius: '8px', 
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+                        }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ 
+                                  width: '120px', 
+                                  padding: '16px', 
+                                  backgroundColor: '#E6F3FF', 
+                                  fontWeight: 700, 
+                                  fontSize: '1.1rem',
+                                  color: '#000000',
+                                  borderRight: '1px solid #333333',
+                                  verticalAlign: 'top',
+                                  textAlign: 'center'
+                                }}>
+                                  작업 내용
+                                </td>
+                                <td style={{ 
+                                  padding: '16px', 
+                                  lineHeight: '1.6',
+                                  wordBreak: 'break-word',
+                                  whiteSpace: 'pre-wrap',
+                                  color: '#000000'
+                                }}>
+                                  {parsedDescription.fullContent}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             </div>

@@ -342,10 +342,12 @@ def get_member_issue_type(issues: List[Dict]) -> Dict: # 수정 불가
                     'subject': issue.get('subject'),
                     'tracker_name': issue.get('tracker_name'),
                     'status_name': issue.get('status_name'),
-                    'created_date': issue.get('created_at'),
+                    'created_at': issue.get('created_at'),
                     'updated_date': issue.get('updated_at'),
                     'description': issue.get('description'),
-                    'is_closed': issue.get('is_closed')
+                    'is_closed': issue.get('is_closed'),
+                    'project_name': issue.get('project_name', ''),
+                    'author_name': issue.get('author_name', '')
                 })
         
         member_issue_data.append({
@@ -415,6 +417,9 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
         product_closed_status = {}
         product_issue_numbers = {}
         product_descriptions = {}
+        product_created_at = {}
+        product_project_names = {}
+        product_author_names = {}
         product_members = {}
         for issue in issue_list:
             product = issue.get('product', 'Unknown')
@@ -423,6 +428,10 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
             description = issue.get('description', '')
             redmine_id = issue.get('redmine_id', 0)
             assigned_to = issue.get('author_name', 'Unknown')
+            created_at = issue.get('created_at', '')
+            project_name = issue.get('project_name', '')
+            author_name = issue.get('author_name', '')
+
             
             if product not in product_stats:
                 product_stats[product] = {
@@ -434,6 +443,9 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
                 product_closed_status[product] = []
                 product_issue_numbers[product] = []
                 product_descriptions[product] = []
+                product_created_at[product] = []
+                product_project_names[product] = []
+                product_author_names[product] = []
                 product_members[product] = {}
             
             product_stats[product]['total'] += 1
@@ -441,6 +453,9 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
             product_closed_status[product].append(is_closed)
             product_issue_numbers[product].append(redmine_id)
             product_descriptions[product].append(description)
+            product_created_at[product].append(created_at)
+            product_project_names[product].append(project_name)
+            product_author_names[product].append(author_name)
             
             # 인원별 통계 추가
             if assigned_to not in product_members[product]:
@@ -456,7 +471,10 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
                 'subject': subject,
                 'redmine_id': redmine_id,
                 'is_closed': is_closed,
-                'description': description
+                'description': description,
+                'created_at': created_at,
+                'project_name': project_name,
+                'author_name': author_name
             })
             
             if is_closed == 1:
@@ -497,6 +515,9 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
                 'issue_closed_status': product_closed_status[product],
                 'issue_numbers': product_issue_numbers[product],
                 'issue_descriptions': product_descriptions[product],
+                'issue_created_at': product_created_at[product],
+                'issue_project_names': product_project_names[product],
+                'issue_author_names': product_author_names[product],
                 'member_details': member_details
             })
         
@@ -614,7 +635,9 @@ def get_progress_detail(issues: List[Dict]) -> Dict: # 수정 불가
             'description': description,
             'status_name': status_name,
             'redmine_id': redmine_id,
-            'author_name': issue.get('author_name', '미지정')
+            'author_name': issue.get('author_name', '미지정'),
+            'created_at': issue.get('created_at', ''),
+            'project_name': issue.get('project_name', '')
         })
     
     # 결과 데이터 구성
@@ -1107,7 +1130,10 @@ def get_hw_equipment_analysis(issues: List[Dict]) -> Dict: # 수정 불가
                 'subject': issue.get('subject', ''),
                 'hw_components': hw_values,
                 'is_closed': issue.get('is_closed', 0),
-                'description': issue.get('description', '')
+                'description': issue.get('description', ''),
+                'project_name': issue.get('project_name', ''),
+                'author_name': issue.get('author_name', ''),
+                'created_at': issue.get('created_at', '')
             }
             equipment_analysis[product_name]['hw_issues'].append(issue_detail)
                     
@@ -1319,7 +1345,8 @@ def get_sw_detail_analysis(issues: List[Dict]) -> Dict: # 수정 불가
             'author_name': issue.get('author_name', ''),
             'status': issue.get('status', ''),
             'project_id': project_id,
-            'project_name': issue.get('project_name', '')
+            'project_name': issue.get('project_name', ''),
+            'created_at': issue.get('created_at', '')
         }
         equipment_analysis[product_name]['project_groups'][project_id]['sw_issues'].append(issue_detail)
     

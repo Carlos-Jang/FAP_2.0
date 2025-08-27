@@ -152,14 +152,62 @@ def get_type_data_list(issues: List[Dict]) -> Dict: # 수정 불가
         # Product별 완료율로 정렬 (내림차순)
         product_details.sort(key=lambda x: x['completion_rate'], reverse=True)
         
+        # Setup 관련 추가 분류
+        setup_status_details = []
+        if 'setup' in tracker_name.lower():
+            # status_name별로 이슈들을 그룹화
+            status_groups = {}
+            for issue in issue_list:
+                status_name = issue.get('status_name', 'Unknown')
+                if status_name not in status_groups:
+                    status_groups[status_name] = []
+                status_groups[status_name].append(issue)
+            
+            # 각 status_name별로 상세 정보 구성
+            for status_name, status_issue_list in status_groups.items():
+                # 셋업은 단계별 진행이므로 완료/미완료 분리 불필요
+                status_total_count = len(status_issue_list)
+                
+                # 이슈 상세 정보 수집
+                status_issue_details = []
+                for issue in status_issue_list:
+                    status_issue_details.append({
+                        'subject': issue.get('subject', '제목 없음'),
+                        'redmine_id': issue.get('redmine_id', 0),
+                        'is_closed': issue.get('is_closed', 0),
+                        'description': issue.get('description', ''),
+                        'author_name': issue.get('author_name', 'Unknown'),
+                        'project_name': issue.get('project_name', 'Unknown'),
+                        'created_at': issue.get('created_at', ''),
+                        'updated_at': issue.get('updated_at', '')
+                    })
+                
+                setup_status_details.append({
+                    'status_name': status_name,
+                    'total_count': status_total_count,
+                    'issue_details': status_issue_details
+                })
+            
+            # status_name 순서 정의
+            status_order = {
+                '[AE][Setup] 반입&레벨링': 1,
+                '[AE][Setup] 기초 Setup': 2,
+                '[AE][Setup] TTTM': 3,
+                '[AE][Setup] 자동화': 4,
+                '[AE][Setup] Setup 완료': 5
+            }
+            
+            # status_name 순서대로 정렬
+            setup_status_details.sort(key=lambda x: status_order.get(x['status_name'], 999))
+        
         type_list.append({
             "tracker_name": tracker_name,
             "total_count": total_count,
             "completed_count": completed_count,
             "in_progress_count": in_progress_count,
             "completion_rate": round(completion_rate, 1),
-            "product_details": product_details
-            
+            "product_details": product_details,
+            "setup_status_details": setup_status_details
         })
     
     # 총 건수로 정렬 (내림차순)
