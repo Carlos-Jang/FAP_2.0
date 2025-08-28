@@ -106,7 +106,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             }
             // User Name에 "AE"가 포함된 경우 AE 관련 탭들만 표시
             if (userName.includes('AE')) {
-              return nav.label === 'Main' || nav.label === 'AE Issues';
+              return nav.label === 'Main' || nav.label === 'AE Issues' || nav.label === 'AE Make Report';
             }
             // 기존 로직 유지 (다른 Role들의 경우)
             return false; // userRoles가 제거되었으므로 항상 false 반환

@@ -1340,8 +1340,8 @@ class DatabaseManager:
             lastname = user_data.get('lastname', '')
             user_email = f"{user_id}@ati2000.co.kr"  # login + @ati2000.co.kr
             
-            # 이름 조합 (firstname + lastname)
-            user_name = f"{firstname} {lastname}".strip()
+            # 이름 조합 (lastname + firstname)
+            user_name = f"{lastname} {firstname}".strip()
             if not user_name:
                 user_name = user_data.get('login', 'Unknown User')
             
